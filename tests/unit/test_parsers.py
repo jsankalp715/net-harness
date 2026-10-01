@@ -97,11 +97,11 @@ def test_parse_bgp_rib() -> None:
 
 
 def test_parse_bfd_peers() -> None:
-    # NOTE: hand-written from FRR's documented `show bfd peers json` schema, not captured
-    # live; test_bfd.py stores the real output in its scenario log for comparison.
+    # fixture: real FRR 10.5.5 session captured in CI (r1, ospf_triangle_bfd) plus a
+    # derived "down" copy. Note FRR emits no "local" key for single-hop sessions.
     peers = {p.peer: p for p in parse_bfd_peers(load("bfd_peers.json"))}
     up, down = peers["10.1.12.2"], peers["10.1.13.2"]
-    assert up.up and up.interface == "eth1" and not up.multihop
+    assert up.up and up.interface == "eth1" and not up.multihop and up.local is None
     assert (up.receive_interval_ms, up.transmit_interval_ms, up.detect_multiplier) == (200, 200, 3)
     assert not down.up and down.status == "down"
 

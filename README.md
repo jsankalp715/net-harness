@@ -270,13 +270,22 @@ Carrier-loss failover is essentially immediate (bounded by the polling resolutio
 is dominated by the 1 s OSPF hello and the 1 s BGP connect-retry timer. Silent loss takes
 about the dead interval, which is exactly what the test asserts.
 
-**CI:** green on GitHub for the base suite
-([run 36920632712](https://github.com/jsankalp715/net-harness/actions/runs/36920632712)),
-and the regression check passed against this baseline.
+**CI (GitHub `ubuntu-24.04`, [run 36938363039](https://github.com/jsankalp715/net-harness/actions/runs/36938363039)):
+52/52 integration + 39/39 unit passed, nothing skipped (netem available on the runner),
+0 regressions.** Carrier-loss failover is faster on CI (≈0.03 s) than under Docker
+Desktop, because `docker exec` is cheaper on native Linux.
 
-**BFD (`test_bfd.py`)** was added later and has so far run **only in CI**. Docker Desktop on
-the development machine stopped starting, so there are no local BFD timings yet; see the
-design notes.
+Silent 100% loss (carrier stays up), with BFD vs. protocol timers alone (CI):
+
+| detection | failover | |
+|---|---:|---|
+| OSPF dead interval (4 s) | 3.49 s | `test_netem.py` |
+| **OSPF + BFD** (200 ms × 3) | **0.58 s** | ~6× faster |
+| BGP hold timer (9 s) | 7.29 s | |
+| **BGP + BFD** (200 ms × 3) | **0.87 s** | ~8× faster |
+
+The BFD scenarios have run only in CI so far: Docker Desktop on the development machine
+stopped starting before they could be run locally (see the design notes).
 
 ## Design decisions & notes
 
@@ -317,20 +326,20 @@ design notes.
   down, by polling `vtysh` every 0.25 s through `docker exec`, which takes about 0.1 s per
   call. Treat the numbers as ±0.3 s, which is why the regression check has a 1 s absolute
   floor.
-- **The baseline was recorded on the dev machine** (Docker Desktop, WSL2 kernel). GitHub
-  runners may be somewhat slower; the tolerance absorbs normal variance. If CI hardware
-  differs a lot, regenerate the baseline from a CI artifact (`compare_baseline.py --update
-  --results <downloaded artifact>`).
 - **BFD timers: 200 ms × 3.** This is deliberately conservative so that scheduler jitter
   on shared CI runners is unlikely to cause false session flaps, and it's still about 7×
   faster than the 4 s OSPF dead interval. The silent-loss test bounds each case on both
   sides: BFD cases must finish within 2 s, and the timer-based BGP case must take at least
   5 s. That proves *which* mechanism detected the failure, not just that it was detected.
-- **BFD JSON schema.** The `show bfd peers json` unit fixture was written from FRR's
-  documented schema, not captured live, because Docker was unavailable at the time. The
-  parser tolerates missing keys, and `test_bfd_sessions_up_with_configured_timers` stores
-  the real output in its scenario log (`events[].raw`) so the fixture can be checked
-  against it.
+- **BFD JSON schema.** The parser was first written from FRR's documented schema because
+  Docker was unavailable. `test_bfd_sessions_up_with_configured_timers` stores the real
+  `show bfd peers json` output in its scenario log (`events[].raw`). The first CI run
+  confirmed the field names, and the unit fixture now uses that captured session. FRR
+  omits `local` for single-hop sessions, and the parser handles that.
+- **The baseline now comes from CI** (run 36938363039), not the dev machine. CI is where
+  regressions are enforced, and local Docker was down. To refresh it, download the
+  `scenario-results-<sha>` artifact (`gh run download`) and run
+  `compare_baseline.py --results <dir> --update`.
 - **UTF-8 everywhere.** All file reads and writes pass `encoding="utf-8"`. Windows
   defaults to cp1252, which crashed when writing the regression report's ❌ marker. Unit
   tests and lint now also run on native Windows Python.
