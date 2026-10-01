@@ -11,7 +11,8 @@ Everything is driven by pytest.
   `quay.io/frrouting/frr:10.5.5` — change it only in `netharness/constants.py` *and* the
   `topologies/*.clab.yml` files (a unit test enforces they match).
 - **Topologies** are containerlab YAML in `topologies/<name>.clab.yml`; per-node template
-  variables live next to them in `topologies/<name>.vars.yml`.
+  variables live next to them in `topologies/<name>.vars.yml`. A variant topology's vars
+  file may start with `extends: <base>.vars.yml` and state only the delta (see `*_bfd`).
 - **Router configs are rendered from Jinja2** templates in `templates/` and pushed with
   `vtysh -f` after deploy. Never hand-write `frr.conf` files.
 - The FRR `daemons` file (`configs/daemons`) is static and bind-mounted; it is not templated.
@@ -40,7 +41,7 @@ topologies/            *.clab.yml + *.vars.yml
 templates/             frr.conf.j2 and partials (_interfaces, _ospf, _bgp)
 configs/daemons        static FRR daemons file
 tests/unit/            no Docker needed (parsers, templates, convergence, baseline script)
-tests/integration/     real labs; markers: ospf, bgp, failure, netem
+tests/integration/     real labs; markers: ospf, bgp, bfd, failure, netem
 tests/conftest.py      lab fixtures + JSON-per-scenario reporting hook
 scripts/               run_in_docker.sh, compare_baseline.py
 baseline/              convergence_baseline.json (checked in)
@@ -54,5 +55,6 @@ docker/runner.Dockerfile  runner image (clab + python) for Docker Desktop hosts
 - Every scenario must leave the lab as it found it (links back up, netem removed).
 - Integration tests use the `scenario` fixture to record routing tables before/after and the
   measured convergence time; the hook in `tests/conftest.py` writes `results/<test>.json`.
+- Always pass `encoding="utf-8"` to read_text/write_text (Windows defaults to cp1252).
 - Interface names: `eth0` is containerlab management; data links start at `eth1`.
 - Add a scenario: see "Adding a scenario" in README.md.

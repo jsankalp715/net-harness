@@ -79,7 +79,9 @@ def safe_filename(test_id: str) -> str:
 def write_record(record: ScenarioRecord, results_dir: Path) -> Path:
     results_dir.mkdir(parents=True, exist_ok=True)
     path = results_dir / safe_filename(record.test_id)
-    path.write_text(json.dumps(record.to_dict(), indent=2, sort_keys=False) + "\n")
+    path.write_text(
+        json.dumps(record.to_dict(), indent=2, sort_keys=False) + "\n", encoding="utf-8"
+    )
     return path
 
 
@@ -89,7 +91,7 @@ def load_records(results_dir: Path) -> list[dict[str, Any]]:
     for path in sorted(results_dir.glob("*.json")):
         if path.name == "summary.json":
             continue
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         if isinstance(data, dict) and "test_id" in data:
             records.append(data)
     return records

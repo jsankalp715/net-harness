@@ -82,6 +82,47 @@ class BgpPath:
     peer: str | None
 
 
+@dataclass(frozen=True)
+class BfdPeer:
+    peer: str
+    local: str | None
+    interface: str | None
+    status: str  # "up" | "down" | "init" | "shutdown"
+    multihop: bool
+    receive_interval_ms: int | None
+    transmit_interval_ms: int | None
+    detect_multiplier: int | None
+
+    @property
+    def up(self) -> bool:
+        return self.status == "up"
+
+
+def _opt_int(value: Any) -> int | None:
+    return None if value is None else int(value)
+
+
+def parse_bfd_peers(data: Any) -> list[BfdPeer]:
+    """Parse ``show bfd peers json``: a list of session objects with hyphenated keys.
+
+    Also accepts ``{"peers": [...]}`` defensively. Unknown/missing keys degrade to None.
+    """
+    entries = data.get("peers", []) if isinstance(data, dict) else (data or [])
+    return [
+        BfdPeer(
+            peer=str(e.get("peer", "")),
+            local=e.get("local"),
+            interface=e.get("interface"),
+            status=str(e.get("status", "unknown")),
+            multihop=bool(e.get("multihop", False)),
+            receive_interval_ms=_opt_int(e.get("receive-interval")),
+            transmit_interval_ms=_opt_int(e.get("transmit-interval")),
+            detect_multiplier=_opt_int(e.get("detect-multiplier")),
+        )
+        for e in entries
+    ]
+
+
 def parse_routes(data: dict[str, Any]) -> RoutingTable:
     """Parse ``show ip route json``."""
     table: RoutingTable = {}

@@ -15,11 +15,13 @@ import yaml
 from netharness import constants
 from netharness.clab import Containerlab
 from netharness.parsers import (
+    BfdPeer,
     BgpPath,
     BgpPeer,
     OspfNeighbor,
     Route,
     RoutingTable,
+    parse_bfd_peers,
     parse_bgp_rib,
     parse_bgp_summary,
     parse_ospf_neighbors,
@@ -92,7 +94,7 @@ class Lab:
         self.topology_file = resolve_topology(topology)
         if not self.topology_file.exists():
             raise FileNotFoundError(self.topology_file)
-        self.spec: dict[str, Any] = yaml.safe_load(self.topology_file.read_text())
+        self.spec: dict[str, Any] = yaml.safe_load(self.topology_file.read_text(encoding="utf-8"))
         self.name: str = self.spec["name"]
         self.prefix: str = self.spec.get("prefix", "clab")
         self.nodes: list[str] = sorted(self.spec["topology"]["nodes"])
@@ -244,6 +246,9 @@ class Lab:
     def get_bgp_rib(self, node: str) -> dict[str, list[BgpPath]]:
         return parse_bgp_rib(self.vtysh_json(node, "show bgp ipv4 unicast json"))
 
+    def get_bfd_peers(self, node: str) -> list[BfdPeer]:
+        return parse_bfd_peers(self.vtysh_json(node, "show bfd peers json"))
+
     def routing_tables(self) -> dict[str, dict[str, dict[str, Any]]]:
         """Selected routes of every node, JSON-serialisable (used for logs)."""
         tables: dict[str, dict[str, dict[str, Any]]] = {}
@@ -259,7 +264,12 @@ class Lab:
         chunks: list[str] = []
         for node in self.nodes:
             chunks.append(f"===== {node} ({self.container(node)}) =====")
-            for cmd in ("show ip route", "show ip ospf neighbor", "show bgp ipv4 unicast summary"):
+            for cmd in (
+                "show ip route",
+                "show ip ospf neighbor",
+                "show bgp ipv4 unicast summary",
+                "show bfd peers brief",
+            ):
                 try:
                     out = self.vtysh(node, cmd, check=False)
                 except Exception as exc:  # diagnostics must never raise

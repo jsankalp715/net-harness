@@ -45,14 +45,14 @@ def test_end_to_end_flags_regression(tmp_path: Path) -> None:
     _write(results, "tests/integration/test_failover.py::test_f[bgp]", "failed", failover=9.0)
     baseline = tmp_path / "baseline.json"
     key = "test_failover.py::test_f[ospf]::failover"
-    baseline.write_text(json.dumps({"tolerance": TOL, "metrics": {key: 1.0}}))
+    baseline.write_text(json.dumps({"tolerance": TOL, "metrics": {key: 1.0}}), encoding="utf-8")
 
     report = tmp_path / "report.md"
     rc = cb.main(["--results", str(results), "--baseline", str(baseline), "--report", str(report)])
     assert rc == 1
-    assert "REGRESSION" in report.read_text()
+    assert "REGRESSION" in report.read_text(encoding="utf-8")
     # failed scenarios never contribute measurements
-    assert "test_f[bgp]" not in report.read_text()
+    assert "test_f[bgp]" not in report.read_text(encoding="utf-8")
     assert cb.main(["--results", str(results), "--baseline", str(baseline), "--warn-only"]) == 0
 
 
@@ -61,7 +61,7 @@ def test_update_writes_baseline(tmp_path: Path) -> None:
     _write(results, "tests/integration/test_ospf.py::test_initial", "passed", initial=1.5)
     baseline = tmp_path / "b" / "baseline.json"
     assert cb.main(["--results", str(results), "--baseline", str(baseline), "--update"]) == 0
-    data = json.loads(baseline.read_text())
+    data = json.loads(baseline.read_text(encoding="utf-8"))
     assert data["metrics"] == {"test_ospf.py::test_initial::initial": 1.5}
 
 

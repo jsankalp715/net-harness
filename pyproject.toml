@@ -37,6 +37,7 @@ markers = [
     "bgp: BGP scenarios",
     "failure: link failure / restore scenarios",
     "netem: netem loss/delay scenarios (skipped if kernel lacks sch_netem)",
+    "bfd: BFD-accelerated failure detection",
 ]
 
 [tool.ruff]

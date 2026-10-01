@@ -35,12 +35,28 @@ def deep_merge(base: Mapping[str, Any], override: Mapping[str, Any]) -> dict[str
     return merged
 
 
+def load_raw_vars(path: Path, _seen: frozenset[Path] = frozenset()) -> dict[str, Any]:
+    """Read a vars file, resolving ``extends: <other.vars.yml>`` (relative to ``path``).
+
+    The extending file is deep-merged onto its parent, so a variant only has to state
+    what differs (e.g. ``defaults: {bfd: {...}}``).
+    """
+    path = path.resolve()
+    if path in _seen:
+        raise ValueError(f"circular 'extends' in {path}")
+    raw: dict[str, Any] = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    parent = raw.pop("extends", None)
+    if parent is None:
+        return raw
+    return deep_merge(load_raw_vars(path.parent / parent, _seen | {path}), raw)
+
+
 def load_vars(path: Path) -> dict[str, dict[str, Any]]:
     """Load a ``*.vars.yml`` file and return node -> variables.
 
     ``defaults`` is deep-merged under every node (node values win).
     """
-    raw = yaml.safe_load(path.read_text()) or {}
+    raw = load_raw_vars(path)
     defaults: dict[str, Any] = raw.get("defaults") or {}
     return {
         name: deep_merge(defaults, node_vars or {})

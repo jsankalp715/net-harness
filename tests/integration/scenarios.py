@@ -116,3 +116,90 @@ BGP_EXPECTED_BEST: list[BgpExpectation] = [
     BgpExpectation("r4", "192.168.2.0/24", "65001", "eth1"),
     BgpExpectation("r4", "192.168.3.0/24", "65002", "eth2"),
 ]
+
+
+# ----------------------------------------------------------------------------- silent loss
+@dataclass(frozen=True)
+class SilentLossCase:
+    """100% netem loss on ``cut`` (carrier stays up): only protocol timers or BFD notice.
+
+    ``min_detect_s``/``max_detect_s`` bound the failover time and prove *which* mechanism
+    detected the failure (e.g. a timer-based case must not be suspiciously fast).
+    """
+
+    id: str
+    topology: str
+    protocol: str
+    bfd: bool
+    observer: str
+    prefix: str
+    cut: tuple[str, str]
+    primary_iface: str
+    backup_iface: str
+    min_detect_s: float
+    max_detect_s: float
+
+
+# The no-BFD OSPF reference (dead interval 4 s) is test_netem.py::
+# test_silent_loss_detected_by_dead_interval; it keeps its own baseline key.
+SILENT_LOSS_CASES: list[SilentLossCase] = [
+    SilentLossCase(
+        id="bgp-hold-timer-no-bfd",
+        topology="bgp_ring",
+        protocol="bgp",
+        bfd=False,
+        observer="r1",
+        prefix="192.168.3.0/24",
+        cut=("r1", "r3"),
+        primary_iface="eth2",
+        backup_iface="eth1",
+        # hold 9 s, keepalive 3 s: expiry lands 6-9 s after the last keepalive got through
+        min_detect_s=5.0,
+        max_detect_s=15.0,
+    ),
+    SilentLossCase(
+        id="ospf-bfd",
+        topology="ospf_triangle_bfd",
+        protocol="ospf",
+        bfd=True,
+        observer="r1",
+        prefix="10.0.0.2/32",
+        cut=("r1", "r2"),
+        primary_iface="eth1",
+        backup_iface="eth2",
+        min_detect_s=0.0,
+        max_detect_s=2.0,  # 3 x 200 ms detection + SPF + polling resolution
+    ),
+    SilentLossCase(
+        id="bgp-bfd",
+        topology="bgp_ring_bfd",
+        protocol="bgp",
+        bfd=True,
+        observer="r1",
+        prefix="192.168.3.0/24",
+        cut=("r1", "r3"),
+        primary_iface="eth2",
+        backup_iface="eth1",
+        min_detect_s=0.0,
+        max_detect_s=2.0,
+    ),
+]
+
+
+def silent_loss_params() -> list[Any]:
+    out = []
+    for c in SILENT_LOSS_CASES:
+        marks = [getattr(pytest.mark, c.protocol)] + ([pytest.mark.bfd] if c.bfd else [])
+        out.append(pytest.param(c.topology, c, id=c.id, marks=marks))
+    return out
+
+
+def bfd_neighbors(vars_: dict[str, dict[str, Any]], node: str) -> set[str]:
+    """Link-peer addresses ``node`` should have a BFD session with."""
+    peers = set()
+    for intf in vars_[node]["interfaces"].values():
+        peer = intf["peer"]
+        for peer_intf in vars_[peer]["interfaces"].values():
+            if peer_intf["peer"] == node:
+                peers.add(peer_intf["address"].split("/")[0])
+    return peers

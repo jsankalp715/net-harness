@@ -1,0 +1,8 @@
+bfd
+ profile {{ node.bfd.profile }}
+  detect-multiplier {{ node.bfd.multiplier }}
+  receive-interval {{ node.bfd.interval_ms }}
+  transmit-interval {{ node.bfd.interval_ms }}
+ exit
+exit
+!

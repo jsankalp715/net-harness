@@ -19,7 +19,7 @@ def test_topologies_exist() -> None:
 
 @pytest.mark.parametrize("path", TOPOLOGIES, ids=lambda p: p.stem)
 def test_image_is_pinned_and_consistent(path: Path) -> None:
-    spec = yaml.safe_load(path.read_text())
+    spec = yaml.safe_load(path.read_text(encoding="utf-8"))
     images = {spec["topology"].get("defaults", {}).get("image")} | {
         n.get("image") for n in spec["topology"]["nodes"].values() if n and n.get("image")
     }

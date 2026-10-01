@@ -1,0 +1,10 @@
+# bgp_ring + BFD on every OSPF interface / BGP session. Only the delta is stated here.
+extends: bgp_ring.vars.yml
+
+defaults:
+  bfd:
+    profile: fast
+    # 200 ms x 3 = 600 ms detection: conservative so shared CI runners / Docker Desktop
+    # scheduling jitter is unlikely to cause false flaps, yet well under the OSPF dead interval (4 s).
+    interval_ms: 200
+    multiplier: 3

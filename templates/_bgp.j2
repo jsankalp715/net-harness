@@ -8,6 +8,10 @@ router bgp {{ node.bgp.asn }}
  neighbor {{ nbr.address }} description {{ nbr.description | default(nbr.address) }}
  neighbor {{ nbr.address }} advertisement-interval 0
  neighbor {{ nbr.address }} timers connect {{ node.bgp.connect_retry }}
+{% if node.bfd is defined %}
+ neighbor {{ nbr.address }} bfd
+ neighbor {{ nbr.address }} bfd profile {{ node.bfd.profile }}
+{% endif %}
 {% endfor %}
  !
  address-family ipv4 unicast
