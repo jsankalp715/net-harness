@@ -203,3 +203,38 @@ def bfd_neighbors(vars_: dict[str, dict[str, Any]], node: str) -> set[str]:
             if peer_intf["peer"] == node:
                 peers.add(peer_intf["address"].split("/")[0])
     return peers
+
+
+# ----------------------------------------------------------------------------- partitions
+@dataclass(frozen=True)
+class PartitionCase:
+    """Cut *every* link of ``isolated``: nobody may keep a (stale) route to it."""
+
+    id: str
+    topology: str
+    protocol: str
+    isolated: str
+    max_withdraw_s: float
+    max_heal_s: float
+
+
+PARTITION_CASES: list[PartitionCase] = [
+    PartitionCase("ospf-isolate-r3", "ospf_triangle", "ospf", "r3", 5.0, 15.0),
+    # r4 is reachable from r1 via iBGP (r2) *and* via r3: after the cut both paths must
+    # be withdrawn, exercising BGP path hunting through the ring.
+    PartitionCase("bgp-isolate-r4", "bgp_ring", "bgp", "r4", 15.0, 20.0),
+]
+
+
+def partition_params() -> list[Any]:
+    return [
+        pytest.param(c.topology, c, id=c.id, marks=[getattr(pytest.mark, c.protocol)])
+        for c in PARTITION_CASES
+    ]
+
+
+def originated_prefixes(vars_: dict[str, dict[str, Any]], node: str) -> set[str]:
+    """Prefixes that exist in the network only because ``node`` announces them."""
+    prefixes = {vars_[node]["loopback"]}
+    prefixes.update(vars_[node].get("bgp", {}).get("networks", []))
+    return prefixes

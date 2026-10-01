@@ -130,6 +130,12 @@ class Lab:
                 return link
         raise KeyError(f"no link between {node_a} and {node_b} in {self.name}")
 
+    def links_of(self, node: str) -> list[Link]:
+        """Every link with ``node`` as an endpoint."""
+        if node not in self.nodes:
+            raise KeyError(f"{node} is not a node of {self.name}")
+        return [lk for lk in self.links if node in (lk.a.node, lk.b.node)]
+
     # ------------------------------------------------------------------ lifecycle
     def deploy(self, *, configure: bool = True, ready_timeout: float = 120) -> None:
         self.clab.deploy(reconfigure=True)
