@@ -286,8 +286,15 @@ Silent 100% loss (carrier stays up), with BFD vs. protocol timers alone (CI):
 | BGP hold timer (9 s) | 7.29 s | |
 | **BGP + BFD** (200 ms × 3) | **0.87 s** | ~8× faster |
 
-The BFD scenarios have run only in CI so far: Docker Desktop on the development machine
-stopped starting before they could be run locally (see the design notes).
+Partition scenarios (CI, [run 36942535017](https://github.com/jsankalp715/net-harness/actions/runs/36942535017),
+54/54 integration passed): routes to an isolated router are withdrawn in **0.39 s** (OSPF
+and BGP alike), and reachability returns **1.17 s** after its links come back.
+
+Everything, including BFD and partitions, also passes locally on Docker Desktop once it
+was working again.
+
+**Windows tip:** download CI artifacts to a short path (e.g. `results/ci`). Long folder
+names plus scenario filenames can exceed Windows' 260-character path limit.
 
 ## Design decisions & notes
 
