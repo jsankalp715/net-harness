@@ -1,0 +1,64 @@
+# Jinja2 variables for bgp_ring.clab.yml. `defaults` is deep-merged under every node.
+defaults:
+  bgp:
+    keepalive: 3
+    holdtime: 9
+    connect_retry: 1
+
+nodes:
+  r1:
+    router_id: 10.0.0.1
+    loopback: 10.0.0.1/32
+    interfaces:
+      eth1: {address: 10.2.12.1/30, peer: r2}
+      eth2: {address: 10.2.13.1/30, peer: r3}
+    static_routes:
+      - {prefix: 192.168.1.0/24, via: blackhole}
+    bgp:
+      asn: 65001
+      networks: [10.0.0.1/32, 192.168.1.0/24]
+      neighbors:
+        - {address: 10.2.12.2, remote_as: 65001, description: r2-ibgp}
+        - {address: 10.2.13.2, remote_as: 65002, description: r3-ebgp}
+  r2:
+    router_id: 10.0.0.2
+    loopback: 10.0.0.2/32
+    interfaces:
+      eth1: {address: 10.2.12.2/30, peer: r1}
+      eth2: {address: 10.2.24.1/30, peer: r4}
+    static_routes:
+      - {prefix: 192.168.2.0/24, via: blackhole}
+    bgp:
+      asn: 65001
+      networks: [10.0.0.2/32, 192.168.2.0/24]
+      neighbors:
+        - {address: 10.2.12.1, remote_as: 65001, description: r1-ibgp}
+        - {address: 10.2.24.2, remote_as: 65003, description: r4-ebgp}
+  r3:
+    router_id: 10.0.0.3
+    loopback: 10.0.0.3/32
+    interfaces:
+      eth1: {address: 10.2.13.2/30, peer: r1}
+      eth2: {address: 10.2.34.1/30, peer: r4}
+    static_routes:
+      - {prefix: 192.168.3.0/24, via: blackhole}
+    bgp:
+      asn: 65002
+      networks: [10.0.0.3/32, 192.168.3.0/24]
+      neighbors:
+        - {address: 10.2.13.1, remote_as: 65001, description: r1-ebgp}
+        - {address: 10.2.34.2, remote_as: 65003, description: r4-ebgp}
+  r4:
+    router_id: 10.0.0.4
+    loopback: 10.0.0.4/32
+    interfaces:
+      eth1: {address: 10.2.24.2/30, peer: r2}
+      eth2: {address: 10.2.34.2/30, peer: r3}
+    static_routes:
+      - {prefix: 192.168.4.0/24, via: blackhole}
+    bgp:
+      asn: 65003
+      networks: [10.0.0.4/32, 192.168.4.0/24]
+      neighbors:
+        - {address: 10.2.24.1, remote_as: 65001, description: r2-ebgp}
+        - {address: 10.2.34.1, remote_as: 65002, description: r3-ebgp}

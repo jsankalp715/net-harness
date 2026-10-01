@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "netharness"
+version = "0.1.0"
+description = "Containerlab + FRR network test harness: OSPF/BGP convergence under link faults"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "jinja2>=3.1",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "mypy>=1.10",
+    "types-PyYAML",
+]
+
+[tool.setuptools]
+packages = ["netharness"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s %(levelname)-7s %(name)s: %(message)s"
+markers = [
+    "unit: pure-python tests, no Docker required",
+    "integration: needs containerlab + Docker",
+    "ospf: OSPF scenarios",
+    "bgp: BGP scenarios",
+    "failure: link failure / restore scenarios",
+    "netem: netem loss/delay scenarios (skipped if kernel lacks sch_netem)",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["netharness", "scripts/compare_baseline.py"]

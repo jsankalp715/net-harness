@@ -1,0 +1,24 @@
+router bgp {{ node.bgp.asn }}
+ bgp router-id {{ node.router_id }}
+ bgp log-neighbor-changes
+ no bgp ebgp-requires-policy
+ timers bgp {{ node.bgp.keepalive }} {{ node.bgp.holdtime }}
+{% for nbr in node.bgp.neighbors %}
+ neighbor {{ nbr.address }} remote-as {{ nbr.remote_as }}
+ neighbor {{ nbr.address }} description {{ nbr.description | default(nbr.address) }}
+ neighbor {{ nbr.address }} advertisement-interval 0
+ neighbor {{ nbr.address }} timers connect {{ node.bgp.connect_retry }}
+{% endfor %}
+ !
+ address-family ipv4 unicast
+{% for prefix in node.bgp.networks %}
+  network {{ prefix }}
+{% endfor %}
+{% for nbr in node.bgp.neighbors %}
+{% if nbr.remote_as == node.bgp.asn %}
+  neighbor {{ nbr.address }} next-hop-self
+{% endif %}
+{% endfor %}
+ exit-address-family
+exit
+!

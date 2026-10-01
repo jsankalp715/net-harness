@@ -1,0 +1,84 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CONTAINERLAB_VERSION: "0.79.0"
+  FRR_IMAGE: "quay.io/frrouting/frr:10.5.5"
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  lint-unit:
+    name: lint + unit tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: make setup
+      - run: make lint
+      - run: make test-unit
+
+  integration:
+    name: containerlab integration suite
+    needs: lint-unit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CLAB_SUDO: "1"                 # containerlab needs root on the runner
+      NETHARNESS_REQUIRE_LAB: "1"    # missing containerlab = failure, not skip
+      NETHARNESS_CONVERGENCE_TIMEOUT: "90"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install containerlab ${{ env.CONTAINERLAB_VERSION }}
+        run: |
+          bash -c "$(curl -sL https://get.containerlab.dev)" -- -v "${CONTAINERLAB_VERSION}"
+          containerlab version
+
+      - name: Kernel capabilities
+        run: |
+          uname -r
+          sudo modprobe sch_netem && echo "sch_netem: available" || echo "sch_netem: MISSING (netem tests will skip)"
+
+      - name: Pre-pull router image
+        run: docker pull "${FRR_IMAGE}"
+
+      - name: Run full suite (make test)
+        run: make test PYTEST_ARGS="-o log_cli=false -q"
+
+      - name: Regression report -> job summary
+        if: always()
+        run: |
+          if [ -f results/regression_report.md ]; then
+            cat results/regression_report.md >> "$GITHUB_STEP_SUMMARY"
+          elif [ -d results ]; then
+            .venv/bin/python scripts/compare_baseline.py --results results \
+              --baseline baseline/convergence_baseline.json --warn-only >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload scenario logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scenario-results-${{ github.sha }}
+          path: results/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Tear down leftover labs
+        if: always()
+        run: make clean CLAB_SUDO=1 || true

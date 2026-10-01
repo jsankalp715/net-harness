@@ -1,0 +1,24 @@
+interface lo
+ ip address {{ node.loopback }}
+{% if node.ospf is defined %}
+ ip ospf area {{ node.ospf.area }}
+{% endif %}
+exit
+!
+{% for ifname, intf in node.interfaces | dictsort %}
+interface {{ ifname }}
+{% if intf.peer is defined %}
+ description link-to-{{ intf.peer }}
+{% endif %}
+ ip address {{ intf.address }}
+{% if node.ospf is defined and intf.ospf | default(true) %}
+ ip ospf area {{ node.ospf.area }}
+ ip ospf network point-to-point
+ ip ospf hello-interval {{ node.ospf.hello_interval }}
+ ip ospf dead-interval {{ node.ospf.dead_interval }}
+ ip ospf retransmit-interval {{ node.ospf.retransmit_interval }}
+ ip ospf cost {{ intf.ospf_cost | default(node.ospf.default_cost) }}
+{% endif %}
+exit
+!
+{% endfor %}

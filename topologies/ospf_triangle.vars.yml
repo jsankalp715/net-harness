@@ -1,0 +1,39 @@
+# Jinja2 variables for ospf_triangle.clab.yml.
+# `defaults` is deep-merged under every node; node values win.
+defaults:
+  ospf:
+    area: 0.0.0.0
+    hello_interval: 1
+    dead_interval: 4
+    # default 5s: one lost DD/LSU while a link comes up (ends don't come up at the same
+    # instant) stalls adjacency formation for a full 5s -> bimodal 1s/5s restore times.
+    retransmit_interval: 1
+    default_cost: 10
+    spf_delay_ms: 0
+    spf_initial_hold_ms: 50
+    spf_max_hold_ms: 1000
+    # RFC 2328 defaults are MinLSInterval=5s / MinLSArrival=1s. With those, a link that
+    # flaps within 5s can't be re-advertised until the interval expires (measured: ~5.0s
+    # restore). Lowered so the lab reconverges on protocol detection, not LSA pacing.
+    lsa_min_interval_ms: 100
+    lsa_min_arrival_ms: 50
+
+nodes:
+  r1:
+    router_id: 10.0.0.1
+    loopback: 10.0.0.1/32
+    interfaces:
+      eth1: {address: 10.1.12.1/30, peer: r2}
+      eth2: {address: 10.1.13.1/30, peer: r3}
+  r2:
+    router_id: 10.0.0.2
+    loopback: 10.0.0.2/32
+    interfaces:
+      eth1: {address: 10.1.12.2/30, peer: r1}
+      eth2: {address: 10.1.23.1/30, peer: r3}
+  r3:
+    router_id: 10.0.0.3
+    loopback: 10.0.0.3/32
+    interfaces:
+      eth1: {address: 10.1.13.2/30, peer: r1}
+      eth2: {address: 10.1.23.2/30, peer: r2}
