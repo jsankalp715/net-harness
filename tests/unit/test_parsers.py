@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from netharness.parsers import (
+    parse_bfd_peers,
     parse_bgp_rib,
     parse_bgp_summary,
     parse_ospf_neighbors,
@@ -17,7 +18,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def load(name: str) -> Any:
-    return json.loads((FIXTURES / name).read_text())
+    return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
 
 
 def test_parse_routes_selected_and_ecmp() -> None:
@@ -93,3 +94,19 @@ def test_parse_bgp_rib() -> None:
     assert best[0].as_path == "65003" and best[0].next_hop == "10.2.12.2"
     local = rib["10.0.0.1/32"][0]
     assert local.as_path == "" and local.best
+
+
+def test_parse_bfd_peers() -> None:
+    # NOTE: hand-written from FRR's documented `show bfd peers json` schema, not captured
+    # live; test_bfd.py stores the real output in its scenario log for comparison.
+    peers = {p.peer: p for p in parse_bfd_peers(load("bfd_peers.json"))}
+    up, down = peers["10.1.12.2"], peers["10.1.13.2"]
+    assert up.up and up.interface == "eth1" and not up.multihop
+    assert (up.receive_interval_ms, up.transmit_interval_ms, up.detect_multiplier) == (200, 200, 3)
+    assert not down.up and down.status == "down"
+
+
+def test_parse_bfd_peers_tolerates_missing_fields_and_wrapping() -> None:
+    (p,) = parse_bfd_peers({"peers": [{"peer": "10.0.0.9", "status": "init"}]})
+    assert p.status == "init" and p.transmit_interval_ms is None and p.local is None
+    assert parse_bfd_peers([]) == [] and parse_bfd_peers({}) == []

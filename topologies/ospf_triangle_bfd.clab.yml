@@ -1,0 +1,30 @@
+# BFD variant of ospf_triangle.clab.yml: identical wiring, separate lab name so it can't collide.
+# Router config differences live in ospf_triangle_bfd.vars.yml (extends ospf_triangle.vars.yml).
+# 3-router OSPF triangle (single area 0).
+#
+#            r1 (10.0.0.1)
+#      eth1 /          \ eth2
+#   10.1.12.0/30    10.1.13.0/30
+#      eth1 /            \ eth1
+#   r2 (10.0.0.2) ---- r3 (10.0.0.3)
+#            eth2  10.1.23.0/30  eth2
+#
+# Addressing / OSPF parameters live in ospf_triangle.vars.yml and are rendered
+# from templates/ by netharness.Lab, then pushed via vtysh.
+name: ospf-tri-bfd
+
+topology:
+  defaults:
+    kind: linux
+    image: quay.io/frrouting/frr:10.5.5
+    binds:
+      - ../configs/daemons:/etc/frr/daemons:ro
+      - ../configs/vtysh.conf:/etc/frr/vtysh.conf:ro
+  nodes:
+    r1: {}
+    r2: {}
+    r3: {}
+  links:
+    - endpoints: ["r1:eth1", "r2:eth1"]
+    - endpoints: ["r1:eth2", "r3:eth1"]
+    - endpoints: ["r2:eth2", "r3:eth2"]

@@ -14,6 +14,7 @@ and the absolute tolerance (sub-second timings are noisy; the absolute floor sto
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import sys
 from dataclasses import dataclass
@@ -47,7 +48,7 @@ def collect_metrics(results_dir: Path) -> dict[str, float]:
     metrics: dict[str, float] = {}
     for path in sorted(results_dir.glob("*.json")):
         try:
-            data: Any = json.loads(path.read_text())
+            data: Any = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             continue
         if not isinstance(data, dict) or "test_id" not in data:
@@ -108,7 +109,7 @@ def render_markdown(rows: list[Comparison], tolerance: dict[str, float]) -> str:
 def load_baseline(path: Path) -> tuple[dict[str, float], dict[str, float]]:
     if not path.exists():
         return {}, dict(DEFAULT_TOLERANCE)
-    data = json.loads(path.read_text())
+    data = json.loads(path.read_text(encoding="utf-8"))
     tolerance = {**DEFAULT_TOLERANCE, **data.get("tolerance", {})}
     return {k: float(v) for k, v in data.get("metrics", {}).items()}, tolerance
 
@@ -121,6 +122,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--update", action="store_true", help="overwrite baseline with results")
     parser.add_argument("--warn-only", action="store_true", help="never exit non-zero")
     args = parser.parse_args(argv)
+    if isinstance(sys.stdout, io.TextIOWrapper):
+        sys.stdout.reconfigure(encoding="utf-8")  # report has emoji; Windows console is cp1252
 
     if not args.results.is_dir():
         print(f"results dir {args.results} not found", file=sys.stderr)
@@ -134,7 +137,7 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         args.baseline.parent.mkdir(parents=True, exist_ok=True)
         payload = {"tolerance": tolerance, "metrics": dict(sorted(current.items()))}
-        args.baseline.write_text(json.dumps(payload, indent=2) + "\n")
+        args.baseline.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         print(f"baseline updated: {len(current)} metric(s) -> {args.baseline}")
         return 0
 
@@ -143,7 +146,7 @@ def main(argv: list[str] | None = None) -> int:
     print(report)
     if args.report:
         args.report.parent.mkdir(parents=True, exist_ok=True)
-        args.report.write_text(report)
+        args.report.write_text(report, encoding="utf-8")
     regressions = sum(r.status == "REGRESSION" for r in rows)
     return 1 if regressions and not args.warn_only else 0
 

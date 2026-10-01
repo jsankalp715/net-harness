@@ -85,7 +85,7 @@ def _clear_previous_run(config: pytest.Config, results_dir: Path) -> None:
 
 def _is_scenario_log(path: Path) -> bool:
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return False
     return isinstance(data, dict) and "test_id" in data and "schema_version" in data
@@ -253,7 +253,9 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
         ],
     }
     results_dir.mkdir(parents=True, exist_ok=True)
-    (results_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+    (results_dir / "summary.json").write_text(
+        json.dumps(summary, indent=2) + "\n", encoding="utf-8"
+    )
 
 
 def pytest_terminal_summary(terminalreporter: Any, exitstatus: int, config: pytest.Config) -> None:

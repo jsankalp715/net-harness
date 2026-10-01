@@ -18,6 +18,10 @@ interface {{ ifname }}
  ip ospf dead-interval {{ node.ospf.dead_interval }}
  ip ospf retransmit-interval {{ node.ospf.retransmit_interval }}
  ip ospf cost {{ intf.ospf_cost | default(node.ospf.default_cost) }}
+{% if node.bfd is defined %}
+ ip ospf bfd
+ ip ospf bfd profile {{ node.bfd.profile }}
+{% endif %}
 {% endif %}
 exit
 !

@@ -98,6 +98,10 @@ else. There is no IGP. Each router originates its loopback and `192.168.N.0/24`.
   AS65002      eBGP      AS65003
 ```
 
+**`ospf_triangle_bfd`, `bgp_ring_bfd`**: the same wiring with BFD (200 ms × 3, about
+600 ms to detect a failure) on every OSPF interface and BGP session. Their vars files hold
+only the difference: `extends: <base>.vars.yml` plus a `defaults.bfd` profile.
+
 ## Setup
 
 ### Linux host (native containerlab, same as CI)
@@ -160,6 +164,7 @@ paths such as `configs/daemons` straight to the Docker daemon, so the two paths 
 | `test_bgp.py` | bgp | every iBGP/eBGP session `Established`, with session type matching the ASNs; each node originates its networks and advertises them to every peer; 12 (node, prefix) best-path checks covering AS path and egress interface; AS-path loop prevention |
 | `test_failover.py` | failure + ospf/bgp | for 4 cases across both topologies: the link cut moves the route to the backup interface within an SLA (failover time recorded); the link restore returns the route to the primary path (restore time recorded) |
 | `test_netem.py` | ospf, netem, failure | 50/150 ms delay leaves adjacency and path untouched past the dead interval; silent 100% loss (carrier stays up) is detected only by the OSPF dead interval, so failover must take ≈ dead interval |
+| `test_bfd.py` | bfd, ospf/bgp, netem, failure | BFD sessions `up` on every link with the configured interval and multiplier; silent 100% loss detected by **BFD in ≤ 2 s** (OSPF and BGP) vs. the **BGP hold timer (5–15 s)** without it (the OSPF no-BFD reference is in `test_netem.py`) |
 
 ### Per-scenario JSON log (`results/<module>__<test>[<id>].json`)
 
@@ -213,7 +218,8 @@ writes `results/regression_report.md` and exits 1 on any regression, which fails
 1. **New topology (optional).** Add `topologies/<name>.clab.yml` (kind `linux`, the pinned
    image, plus the two `configs/` binds; copy an existing file) and
    `topologies/<name>.vars.yml` with per-node `router_id`, `loopback`, `interfaces`
-   (`address`, `peer`) and `ospf:` and/or `bgp:` blocks. `tests/unit/test_topologies.py`
+   (`address`, `peer`) and `ospf:` / `bgp:` / `bfd:` blocks. For a variant of an existing
+   topology, start the vars file with `extends: <base>.vars.yml` and state only the delta. `tests/unit/test_topologies.py`
    checks that the image pin, the link endpoints and the subnets are consistent.
 2. **New config feature (optional).** Extend a partial in `templates/` and add a unit test in
    `tests/unit/test_render.py`. Unknown variables fail loudly (`StrictUndefined`).
@@ -264,8 +270,13 @@ Carrier-loss failover is essentially immediate (bounded by the polling resolutio
 is dominated by the 1 s OSPF hello and the 1 s BGP connect-retry timer. Silent loss takes
 about the dead interval, which is exactly what the test asserts.
 
-The GitHub Actions workflow has been written, but it has **not run yet**: the project
-hasn't been pushed anywhere.
+**CI:** green on GitHub for the base suite
+([run 36920632712](https://github.com/jsankalp715/net-harness/actions/runs/36920632712)),
+and the regression check passed against this baseline.
+
+**BFD (`test_bfd.py`)** was added later and has so far run **only in CI**. Docker Desktop on
+the development machine stopped starting, so there are no local BFD timings yet; see the
+design notes.
 
 ## Design decisions & notes
 
@@ -310,6 +321,19 @@ hasn't been pushed anywhere.
   runners may be somewhat slower; the tolerance absorbs normal variance. If CI hardware
   differs a lot, regenerate the baseline from a CI artifact (`compare_baseline.py --update
   --results <downloaded artifact>`).
+- **BFD timers: 200 ms × 3.** This is deliberately conservative so that scheduler jitter
+  on shared CI runners is unlikely to cause false session flaps, and it's still about 7×
+  faster than the 4 s OSPF dead interval. The silent-loss test bounds each case on both
+  sides: BFD cases must finish within 2 s, and the timer-based BGP case must take at least
+  5 s. That proves *which* mechanism detected the failure, not just that it was detected.
+- **BFD JSON schema.** The `show bfd peers json` unit fixture was written from FRR's
+  documented schema, not captured live, because Docker was unavailable at the time. The
+  parser tolerates missing keys, and `test_bfd_sessions_up_with_configured_timers` stores
+  the real output in its scenario log (`events[].raw`) so the fixture can be checked
+  against it.
+- **UTF-8 everywhere.** All file reads and writes pass `encoding="utf-8"`. Windows
+  defaults to cp1252, which crashed when writing the regression report's ❌ marker. Unit
+  tests and lint now also run on native Windows Python.
 - **Results hygiene.** The first scenario log written in a session removes the previous
   run's scenario JSONs (pass `--keep-results` to keep them), so the comparison never reads
   stale data. Unit-only runs leave `results/` untouched.

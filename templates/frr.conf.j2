@@ -9,6 +9,9 @@ log stdout informational
 ip route {{ route.prefix }} {{ route.via }}
 {% endfor %}
 !
+{% if node.bfd is defined %}
+{% include "_bfd.j2" %}
+{% endif %}
 {% if node.ospf is defined %}
 {% include "_ospf.j2" %}
 {% endif %}

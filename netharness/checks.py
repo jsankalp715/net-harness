@@ -67,6 +67,16 @@ def bgp_established(lab: Lab, node: str, peers: Iterable[str]) -> Predicate:
     return _named(check, f"{node} BGP Established with {sorted(expected)}")
 
 
+def bfd_peers_up(lab: Lab, node: str, peers: Iterable[str]) -> Predicate:
+    expected = set(peers)
+
+    def check() -> bool:
+        up = {p.peer for p in lab.get_bfd_peers(node) if p.up}
+        return expected <= up
+
+    return _named(check, f"{node} BFD up with {sorted(expected)}")
+
+
 def full_loopback_reachability(lab: Lab) -> Predicate:
     """Every node has a selected route to every other node's loopback."""
     loopbacks = {n: str(lab.node_vars[n]["loopback"]) for n in lab.nodes}
