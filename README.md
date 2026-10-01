@@ -229,7 +229,7 @@ writes `results/regression_report.md` and exits 1 on any regression, which fails
    def test_my_case(lab, faults, scenario):
        t = faults.link_down(lab.link_between("r1", "r2"))
        secs = wait_for_convergence(route_via(lab, "r1", "10.0.0.2/32", "eth2"), lab=lab, start=t)
-       scenario.record_convergence("failover", secs)   # -> JSON log + baseline comparison
+       scenario.record_convergence("failover", secs)  # -> JSON log + baseline comparison
    ```
 
    Snapshots before and after, the JSON log, and fault cleanup are handled by the fixtures.
