@@ -14,11 +14,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Dev tools are pinned exactly: a new ruff release once broke CI by changing format
+# rules (it began formatting code blocks inside README.md). Bump deliberately.
 dev = [
-    "pytest>=8.0",
-    "ruff>=0.6",
-    "mypy>=1.10",
-    "types-PyYAML",
+    "pytest==9.1.1",
+    "ruff==0.16.10",
+    "mypy==2.4.0",
+    "types-PyYAML==6.0.12.20260906",
 ]
 
 [tool.setuptools]
