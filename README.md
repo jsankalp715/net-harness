@@ -212,7 +212,7 @@ writes `results/regression_report.md` and exits 1 on any regression, which fails
 2. **integration**: installs containerlab 0.79.0, checks for `sch_netem`, pre-pulls
    FRR, runs `make test` with `CLAB_SUDO=1` and `NETHARNESS_REQUIRE_LAB=1` (a missing
    containerlab is a failure, not a silent skip), posts the regression report to the job
-   summary, and uploads `results/` as the `scenario-results-<sha>` artifact.
+   summary, and uploads `results/` as the `results-run<N>` artifact.
 
 ## Adding a new scenario
 
@@ -347,7 +347,7 @@ names plus scenario filenames can exceed Windows' 260-character path limit.
   omits `local` for single-hop sessions, and the parser handles that.
 - **The baseline now comes from CI** (run 36938363039), not the dev machine. CI is where
   regressions are enforced, and local Docker was down. To refresh it, download the
-  `scenario-results-<sha>` artifact (`gh run download`) and run
+  `results-run<N>` artifact (`gh run download`) and run
   `compare_baseline.py --results <dir> --update`.
 - **UTF-8 everywhere.** All file reads and writes pass `encoding="utf-8"`. Windows
   defaults to cp1252, which crashed when writing the regression report's ❌ marker. Unit
