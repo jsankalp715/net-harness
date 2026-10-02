@@ -60,7 +60,8 @@ def wait_for_convergence(
         start: ``time.monotonic()`` reference point. Pass the instant a fault was
             injected so the returned time is the true convergence time.
         consecutive: require this many successive true polls (guards against flaps).
-            The elapsed time reported is that of the *first* poll in the stable run.
+            The elapsed time reported is the *end* of the first poll in the stable run,
+            i.e. the instant convergence was first observed (a conservative upper bound).
 
     Raises:
         ConvergenceTimeout: with a diagnostic dump of every node's routing table.
@@ -82,7 +83,10 @@ def wait_for_convergence(
             last_error = "".join(traceback.format_exception_only(type(exc), exc)).strip()
         if ok:
             if streak == 0:
-                first_true = now
+                # stamp when the poll *finished*: that's when convergence was observed.
+                # (Stamping its start under-reports by the poll's duration, which is
+                # ~1 s for predicates that query many nodes.)
+                first_true = time.monotonic()
             streak += 1
             if streak >= consecutive:
                 assert first_true is not None

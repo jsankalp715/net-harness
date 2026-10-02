@@ -64,3 +64,12 @@ def test_consecutive_resets_on_flap() -> None:
 
     wait_for_convergence(pred, 1, 0.001, consecutive=3)
     assert len(calls) == 5
+
+
+def test_elapsed_includes_the_duration_of_the_successful_poll() -> None:
+    # a slow predicate (like one querying 12 routes) must not be reported as instant
+    def slow_true() -> bool:
+        time.sleep(0.2)
+        return True
+
+    assert wait_for_convergence(slow_true, 2, 0.01) >= 0.2

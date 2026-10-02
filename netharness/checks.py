@@ -78,14 +78,17 @@ def bfd_peers_up(lab: Lab, node: str, peers: Iterable[str]) -> Predicate:
 
 
 def full_loopback_reachability(lab: Lab) -> Predicate:
-    """Every node has a selected route to every other node's loopback."""
+    """Every node has a selected route to every other node's loopback.
+
+    Pairs listed in the vars file's ``expect.unreachable_loopbacks`` are skipped.
+    """
     loopbacks = {n: str(lab.node_vars[n]["loopback"]) for n in lab.nodes}
 
     def check() -> bool:
         for node in lab.nodes:
             table = lab.get_routes(node)
             for other, prefix in loopbacks.items():
-                if other == node:
+                if other == node or frozenset((node, other)) in lab.unreachable_pairs:
                     continue
                 if not any(r.selected and r.installed for r in table.get(prefix, [])):
                     return False

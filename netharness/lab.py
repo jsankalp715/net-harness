@@ -29,7 +29,7 @@ from netharness.parsers import (
     selected_route,
     table_summary,
 )
-from netharness.render import load_vars, make_env, render_node_config
+from netharness.render import load_raw_vars, load_vars, make_env, render_node_config
 from netharness.shell import CommandError, CommandResult, run
 
 log = logging.getLogger(__name__)
@@ -107,6 +107,15 @@ class Lab:
         missing = set(self.nodes) - set(self.node_vars)
         if missing:
             raise LabError(f"{vars_path.name} has no vars for nodes: {sorted(missing)}")
+        #: node pairs whose loopbacks are *by design* unreachable from each other (vars:
+        #: ``expect.unreachable_loopbacks``), e.g. same-AS spines in an eBGP fabric
+        expect = load_raw_vars(vars_path).get("expect") or {}
+        self.unreachable_pairs: set[frozenset[str]] = {
+            frozenset(pair) for pair in expect.get("unreachable_loopbacks", [])
+        }
+        unknown = {n for pair in self.unreachable_pairs for n in pair} - set(self.nodes)
+        if unknown:
+            raise LabError(f"{vars_path.name}: unreachable_loopbacks names unknown {unknown}")
 
         self.clab = clab or Containerlab(self.topology_file)
         self.docker_bin = docker_bin

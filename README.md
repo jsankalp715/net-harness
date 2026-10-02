@@ -102,6 +102,20 @@ else. There is no IGP. Each router originates its loopback and `192.168.N.0/24`.
 600 ms to detect a failure) on every OSPF interface and BGP session. Their vars files hold
 only the difference: `extends: <base>.vars.yml` plus a `defaults.bfd` profile.
 
+**`spine_leaf`**: a 2-spine, 4-leaf eBGP data-centre fabric (RFC 7938 style). Every leaf
+has one uplink to each spine. The spines share AS 65100, and the leaves are AS 65101–65104
+with `maximum-paths 4`, so leaf-to-leaf traffic is load-balanced over both spines (ECMP).
+Because the spines share an AS, they can never learn each other's loopbacks: the only
+path is spine → leaf → spine, which the receiving spine rejects. The vars file declares
+this under `expect.unreachable_loopbacks`, so the reachability checks skip that pair, and a
+test asserts it really is unreachable.
+
+```
+     spine1 (AS65100)      spine2 (AS65100)
+           |  full mesh to every leaf  |
+ leaf1    leaf2    leaf3    leaf4      (leafN: eth1 -> spine1, eth2 -> spine2)
+```
+
 ## Setup
 
 ### Linux host (native containerlab, same as CI)
@@ -165,6 +179,7 @@ paths such as `configs/daemons` straight to the Docker daemon, so the two paths 
 | `test_bgp.py` | bgp | every iBGP/eBGP session `Established`, with session type matching the ASNs; each node originates its networks and advertises them to every peer; 12 (node, prefix) best-path checks covering AS path and egress interface; AS-path loop prevention |
 | `test_failover.py` | failure + ospf/bgp | for 4 cases across both topologies: the link cut moves the route to the backup interface within an SLA (failover time recorded); the link restore returns the route to the primary path (restore time recorded) |
 | `test_netem.py` | ospf, netem, failure | 50/150 ms delay leaves adjacency and path untouched past the dead interval; silent 100% loss (carrier stays up) is detected only by the OSPF dead interval, so failover must take ≈ dead interval |
+| `test_spine_leaf.py` | bgp, failure | All 12 fabric sessions up; **2-way ECMP** for all 12 leaf pairs (AS path `65100 <leaf>`); one uplink failure collapses the affected paths onto the other spine and restores ECMP; a **whole spine failing** drains all 12 leaf-pair paths onto the survivor and back; the spines never learn each other's loopback |
 | `test_partition.py` | failure, ospf/bgp | Isolating a router (all of its links cut) makes every other router **withdraw** its prefixes, and the isolated router loses all learned routes. There's no stale route left to blackhole traffic, and the withdrawn state must hold for 3 s, so BGP path hunting has really settled. Withdrawal and heal times are recorded |
 | `test_bfd.py` | bfd, ospf/bgp, netem, failure | BFD sessions `up` on every link with the configured interval and multiplier; silent 100% loss detected by **BFD in ≤ 2 s** (OSPF and BGP) vs. the **BGP hold timer (5–15 s)** without it (the OSPF no-BFD reference is in `test_netem.py`) |
 
@@ -349,10 +364,19 @@ names plus scenario filenames can exceed Windows' 260-character path limit.
   land at 0.10–0.13 s failover and 1.12–1.17 s restore. The lab fixture and fault teardown
   now also wait for a **steady state** (tables unchanged over 3 polls), not just
   reachability, so a scenario never starts while the previous one is still converging.
-- **Timing resolution.** Convergence is measured from the instant the first interface goes
-  down, by polling `vtysh` every 0.25 s through `docker exec`, which takes about 0.1 s per
-  call. Treat the numbers as ±0.3 s, which is why the regression check has a 1 s absolute
-  floor.
+- **Timing method.** Convergence is measured from the instant the first interface goes
+  down (or comes back up) until the **end of the first poll that sees the target state**,
+  by polling `vtysh` every 0.25 s through `docker exec` (about 0.1 s per call). Each value
+  is a conservative upper bound: checks that query many routers, such as a full fabric or
+  a partition, add their own duration of up to about 1 s. That's why the regression check
+  has a 1 s absolute floor.
+- **Timing bug fixed (spine-leaf PR).** A spine restore reported an impossible 0.000 s.
+  There were two causes. `wait_for_convergence` stamped the *start* of the successful
+  poll, so a 1.2 s fabric-wide check hid its own duration. `heal_node` timed from the
+  *last* link restored, while BGP was already reconverging on the earlier links. Both now
+  time conservatively. Multi-router measurements moved up accordingly (for example, the
+  OSPF partition withdrawal went from 0.20 s to 0.94 s), and the baseline was regenerated
+  under the corrected method.
 - **BFD timers: 200 ms × 3.** This is deliberately conservative so that scheduler jitter
   on shared CI runners is unlikely to cause false session flaps, and it's still about 7×
   faster than the 4 s OSPF dead interval. The silent-loss test bounds each case on both

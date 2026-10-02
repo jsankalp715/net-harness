@@ -93,11 +93,17 @@ class FaultInjector:
         return t
 
     def heal_node(self, node: str) -> float:
-        """Restore every link of ``node``. Returns the instant the last link came up."""
-        t = time.monotonic()
+        """Restore every link of ``node``. Returns the instant the *first* link came up.
+
+        Mirrors :meth:`isolate_node` (first cut): restoring many links takes ~1 s, and
+        protocols start reconverging on the early links meanwhile, so timing from the
+        last one would under-report.
+        """
+        first: float | None = None
         for link in self.lab.links_of(node):
             t = self.link_up(link)
-        return t
+            first = t if first is None else first
+        return first if first is not None else time.monotonic()
 
     # ------------------------------------------------------------- netem
     def netem_supported(self, ep: Endpoint) -> bool:
