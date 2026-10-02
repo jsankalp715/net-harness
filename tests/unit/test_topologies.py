@@ -49,3 +49,13 @@ def test_lab_parses_links_and_container_names() -> None:
     assert link.endpoint("r1").interface == "eth1"
     with pytest.raises(KeyError):
         lab.link_between("r1", "r9")
+
+
+def test_links_of_lists_every_link_of_a_node() -> None:
+    lab = Lab("bgp_ring")
+    assert {str(lk) for lk in lab.links_of("r4")} == {
+        "r2:eth2 <-> r4:eth1",
+        "r3:eth2 <-> r4:eth2",
+    }
+    with pytest.raises(KeyError):
+        lab.links_of("r9")

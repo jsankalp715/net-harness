@@ -80,6 +80,25 @@ class FaultInjector:
         finally:
             self.link_up(link)
 
+    def isolate_node(self, node: str) -> float:
+        """Cut every link of ``node`` (a partition). Returns the instant of the first cut.
+
+        Links are cut one after another, so the partition is complete only once the last
+        ``ip link`` returns; measuring from the *first* cut is the conservative choice.
+        """
+        links = self.lab.links_of(node)
+        t = self.link_down(links[0])
+        for link in links[1:]:
+            self.link_down(link)
+        return t
+
+    def heal_node(self, node: str) -> float:
+        """Restore every link of ``node``. Returns the instant the last link came up."""
+        t = time.monotonic()
+        for link in self.lab.links_of(node):
+            t = self.link_up(link)
+        return t
+
     # ------------------------------------------------------------- netem
     def netem_supported(self, ep: Endpoint) -> bool:
         """Probe once by adding (and removing) a zero-delay netem qdisc."""

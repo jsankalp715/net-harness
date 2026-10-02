@@ -164,6 +164,7 @@ paths such as `configs/daemons` straight to the Docker daemon, so the two paths 
 | `test_bgp.py` | bgp | every iBGP/eBGP session `Established`, with session type matching the ASNs; each node originates its networks and advertises them to every peer; 12 (node, prefix) best-path checks covering AS path and egress interface; AS-path loop prevention |
 | `test_failover.py` | failure + ospf/bgp | for 4 cases across both topologies: the link cut moves the route to the backup interface within an SLA (failover time recorded); the link restore returns the route to the primary path (restore time recorded) |
 | `test_netem.py` | ospf, netem, failure | 50/150 ms delay leaves adjacency and path untouched past the dead interval; silent 100% loss (carrier stays up) is detected only by the OSPF dead interval, so failover must take ≈ dead interval |
+| `test_partition.py` | failure, ospf/bgp | Isolating a router (all of its links cut) makes every other router **withdraw** its prefixes, and the isolated router loses all learned routes. There's no stale route left to blackhole traffic, and the withdrawn state must hold for 3 s, so BGP path hunting has really settled. Withdrawal and heal times are recorded |
 | `test_bfd.py` | bfd, ospf/bgp, netem, failure | BFD sessions `up` on every link with the configured interval and multiplier; silent 100% loss detected by **BFD in ≤ 2 s** (OSPF and BGP) vs. the **BGP hold timer (5–15 s)** without it (the OSPF no-BFD reference is in `test_netem.py`) |
 
 ### Per-scenario JSON log (`results/<module>__<test>[<id>].json`)
@@ -227,6 +228,7 @@ writes `results/regression_report.md` and exits 1 on any regression, which fails
    `tests/integration/scenarios.py`. It is automatically parametrized into both the failure
    and the restore test, gets the right protocol marker, and shares the deployed lab with
    the other cases of the same topology.
+   Partitions work the same way: append a `PartitionCase` to `PARTITION_CASES`.
 4. **New kind of test.** In a module with `TOPOLOGY = "<name>"`, or parametrize `lab`
    indirectly, request `lab`, `scenario` and, for fault tests, `faults`:
 
@@ -284,8 +286,15 @@ Silent 100% loss (carrier stays up), with BFD vs. protocol timers alone (CI):
 | BGP hold timer (9 s) | 7.29 s | |
 | **BGP + BFD** (200 ms × 3) | **0.87 s** | ~8× faster |
 
-The BFD scenarios have run only in CI so far: Docker Desktop on the development machine
-stopped starting before they could be run locally (see the design notes).
+Partition scenarios (CI, [run 36942535017](https://github.com/jsankalp715/net-harness/actions/runs/36942535017),
+54/54 integration passed): routes to an isolated router are withdrawn in **0.39 s** (OSPF
+and BGP alike), and reachability returns **1.17 s** after its links come back.
+
+Everything, including BFD and partitions, also passes locally on Docker Desktop once it
+was working again.
+
+**Windows tip:** download CI artifacts to a short path (e.g. `results/ci`). Long folder
+names plus scenario filenames can exceed Windows' 260-character path limit.
 
 ## Design decisions & notes
 

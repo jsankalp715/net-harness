@@ -117,6 +117,38 @@ def steady_state(lab: Lab) -> Predicate:
     return all_of(full_loopback_reachability(lab), routing_stable(lab))
 
 
+def prefixes_withdrawn(lab: Lab, nodes: Iterable[str], prefixes: Iterable[str]) -> Predicate:
+    """No node in ``nodes`` has a selected+installed route for any of ``prefixes``.
+
+    Exact-prefix match on the full table: ``show ip route <prefix>`` would fall back to a
+    covering route (e.g. the default route via eth0) and report the prefix as present.
+    """
+    nodes, prefixes = sorted(nodes), sorted(prefixes)
+
+    def check() -> bool:
+        for node in nodes:
+            table = lab.get_routes(node)
+            for prefix in prefixes:
+                if any(r.selected and r.installed for r in table.get(prefix, [])):
+                    return False
+        return True
+
+    return _named(check, f"{prefixes} withdrawn on {nodes}")
+
+
+def only_connected_routes(lab: Lab, node: str, protocols: Iterable[str]) -> Predicate:
+    """``node`` has no selected route learned via any of ``protocols`` (it is isolated)."""
+    protos = set(protocols)
+
+    def check() -> bool:
+        table = lab.get_routes(node)
+        return not any(
+            r.selected and r.protocol in protos for routes in table.values() for r in routes
+        )
+
+    return _named(check, f"{node} has no {sorted(protos)} routes")
+
+
 def all_of(*predicates: Predicate) -> Predicate:
     def check() -> bool:
         return all(p() for p in predicates)
