@@ -144,6 +144,7 @@ paths such as `configs/daemons` straight to the Docker daemon, so the two paths 
 | `make lint` | `ruff check`, `ruff format --check`, `mypy --strict` |
 | `make clean` | destroy leftover labs, remove `results/` and caches |
 | `make baseline-check` / `baseline-update` | compare against / overwrite the stored baseline |
+| `make trends` | plot every metric across past CI runs → `results/trends/index.html` (needs `gh auth login`) |
 | `make docker-test` | `scripts/run_in_docker.sh` |
 
 ### Useful pytest selections
@@ -203,6 +204,23 @@ absolute floor keeps sub-second noise (0.1 s → 0.25 s) from being flagged. The
 writes `results/regression_report.md` and exits 1 on any regression, which fails
 `make test` and CI. To refresh the baseline after an intentional change:
 `make baseline-update`, then commit the file.
+
+### Trends across CI runs
+
+The baseline check catches sudden jumps. It can't see a slow creep, such as +0.05 s per
+change that never crosses the tolerance. `make trends` (`scripts/collect_trends.py`)
+downloads the results artifact of every successful CI run with `gh`, caching it under
+`results/trends/runs/`, and writes:
+
+- `results/trends/index.html`: small multiples, one line chart per metric, oldest run to
+  newest. The stored baseline is a dashed reference line. Hovering a point shows its run
+  number, branch, commit and time. A data table follows, with min, median, max and latest
+  per metric and the latest value compared with the baseline.
+- `results/trends/history.json`: the same data in machine-readable form.
+
+The page is a single self-contained HTML file with no external scripts, and it follows the
+OS light/dark setting. CI artifacts expire after 30 days, so the report covers roughly the
+last month.
 
 ### CI
 

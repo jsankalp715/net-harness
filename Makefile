@@ -10,7 +10,7 @@ CLAB     := $(if $(filter 1,$(CLAB_SUDO)),sudo -E ,)$(CLAB_BIN)
 PYTEST_ARGS ?=
 
 .PHONY: help setup test test-unit test-integration lint format clean distclean \
-        docker-test baseline-check baseline-update
+        docker-test baseline-check baseline-update trends
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -50,6 +50,9 @@ baseline-check: ## Compare results/ against the stored baseline
 
 baseline-update: ## Overwrite the stored baseline with the latest results/
 	$(BIN)/python scripts/compare_baseline.py --results results --baseline baseline/convergence_baseline.json --update
+
+trends: setup ## Plot convergence times across CI runs -> results/trends/index.html (needs gh)
+	$(BIN)/python scripts/collect_trends.py
 
 docker-test: ## Run the full suite inside the runner container (Docker Desktop hosts)
 	bash scripts/run_in_docker.sh

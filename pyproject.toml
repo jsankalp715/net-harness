@@ -50,4 +50,5 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
 [tool.mypy]
 python_version = "3.11"
 strict = true
-files = ["netharness", "scripts/compare_baseline.py"]
+files = ["netharness", "scripts/compare_baseline.py", "scripts/collect_trends.py"]
+mypy_path = "scripts"
