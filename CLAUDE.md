@@ -1,4 +1,4 @@
-# CLAUDE.md — net-harness
+  # CLAUDE.md — net-harness
 
 Automated network test harness: spins up containerlab topologies of FRR routers,
 configures OSPF/BGP, injects link faults, and asserts routing-table convergence.
@@ -56,5 +56,7 @@ docker/runner.Dockerfile  runner image (clab + python) for Docker Desktop hosts
 - Integration tests use the `scenario` fixture to record routing tables before/after and the
   measured convergence time; the hook in `tests/conftest.py` writes `results/<test>.json`.
 - Always pass `encoding="utf-8"` to read_text/write_text (Windows defaults to cp1252).
+- Dual-stack: a node with `loopback6` gets IPv6 (OSPFv3 / BGP-v6); `Lab` methods take
+  `afi="ipv6"`, and `get_route()` picks the family from the prefix.
 - Interface names: `eth0` is containerlab management; data links start at `eth1`.
 - Add a scenario: see "Adding a scenario" in README.md.

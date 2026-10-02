@@ -18,6 +18,17 @@ topology:
     binds:
       - ../configs/daemons:/etc/frr/daemons:ro
       - ../configs/vtysh.conf:/etc/frr/vtysh.conf:ro
+    # Dual-stack: forward IPv6, and skip Duplicate Address Detection. Measured: with DAD,
+    # every IPv6 recovery waited ~1.4-2.3 s for addresses to leave "tentative" (OSPFv3
+    # restore 2.71 s vs 1.33 s without). Statically addressed p2p links can't collide.
+    # See docs/FINDINGS.md.
+    sysctls:
+      net.ipv6.conf.all.disable_ipv6: 0
+      net.ipv6.conf.all.forwarding: 1
+      net.ipv6.conf.all.accept_dad: 0
+      net.ipv6.conf.default.accept_dad: 0
+      net.ipv6.conf.all.dad_transmits: 0
+      net.ipv6.conf.default.dad_transmits: 0
   nodes:
     r1: {}
     r2: {}

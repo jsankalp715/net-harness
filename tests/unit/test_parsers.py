@@ -8,6 +8,7 @@ from netharness.parsers import (
     parse_bfd_peers,
     parse_bgp_rib,
     parse_bgp_summary,
+    parse_ospf6_neighbors,
     parse_ospf_neighbors,
     parse_routes,
     selected_route,
@@ -110,3 +111,11 @@ def test_parse_bfd_peers_tolerates_missing_fields_and_wrapping() -> None:
     (p,) = parse_bfd_peers({"peers": [{"peer": "10.0.0.9", "status": "init"}]})
     assert p.status == "init" and p.transmit_interval_ms is None and p.local is None
     assert parse_bfd_peers([]) == [] and parse_bfd_peers({}) == []
+
+
+def test_parse_ospf6_neighbors() -> None:
+    # fixture: real FRR 10.5.5 output (r1, dual-stack triangle); r3 edited to ExStart
+    nbrs = {n.router_id: n for n in parse_ospf6_neighbors(load("ospf6_neighbors.json"))}
+    assert nbrs["10.0.0.2"].is_full and nbrs["10.0.0.2"].interface == "eth1"
+    assert nbrs["10.0.0.3"].state == "ExStart" and not nbrs["10.0.0.3"].is_full
+    assert parse_ospf6_neighbors({}) == []

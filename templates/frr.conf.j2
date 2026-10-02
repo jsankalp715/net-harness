@@ -8,12 +8,18 @@ log stdout informational
 {% for route in node.static_routes | default([]) %}
 ip route {{ route.prefix }} {{ route.via }}
 {% endfor %}
+{% for route in node.static_routes6 | default([]) %}
+ipv6 route {{ route.prefix }} {{ route.via }}
+{% endfor %}
 !
 {% if node.bfd is defined %}
 {% include "_bfd.j2" %}
 {% endif %}
 {% if node.ospf is defined %}
 {% include "_ospf.j2" %}
+{% if node.loopback6 is defined %}
+{% include "_ospf6.j2" %}
+{% endif %}
 {% endif %}
 {% if node.bgp is defined %}
 {% include "_bgp.j2" %}

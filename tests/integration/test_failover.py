@@ -18,7 +18,7 @@ pytestmark = [pytest.mark.failure]
 
 def _wait_primary(lab: Lab, case: FailoverCase, start: float | None = None) -> float:
     return wait_for_convergence(
-        route_via(lab, case.observer, case.prefix, case.primary_iface, case.protocol),
+        route_via(lab, case.observer, case.prefix, case.primary_iface, case.rib_protocol),
         lab=lab,
         start=start,
         consecutive=2,
@@ -27,7 +27,7 @@ def _wait_primary(lab: Lab, case: FailoverCase, start: float | None = None) -> f
 
 def _wait_backup(lab: Lab, case: FailoverCase, start: float) -> float:
     return wait_for_convergence(
-        route_via(lab, case.observer, case.prefix, case.backup_iface, case.protocol),
+        route_via(lab, case.observer, case.prefix, case.backup_iface, case.rib_protocol),
         lab=lab,
         start=start,
         consecutive=2,
