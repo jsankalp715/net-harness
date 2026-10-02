@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from typing import Any
 
-from netharness.lab import Lab
+from netharness.lab import Afi, Lab, afi_of
 
 Predicate = Callable[[], bool]
 
@@ -47,24 +47,27 @@ def route_absent(lab: Lab, node: str, prefix: str) -> Predicate:
     return _named(lambda: lab.get_route(node, prefix) is None, f"{node} has no {prefix}")
 
 
-def ospf_neighbors_full(lab: Lab, node: str, router_ids: Iterable[str]) -> Predicate:
+def ospf_neighbors_full(
+    lab: Lab, node: str, router_ids: Iterable[str], afi: Afi = "ipv4"
+) -> Predicate:
     expected = set(router_ids)
 
     def check() -> bool:
-        full = {n.router_id for n in lab.get_ospf_neighbors(node) if n.is_full}
+        full = {n.router_id for n in lab.get_ospf_neighbors(node, afi) if n.is_full}
         return expected <= full
 
-    return _named(check, f"{node} OSPF Full with {sorted(expected)}")
+    proto = "OSPFv3" if afi == "ipv6" else "OSPF"
+    return _named(check, f"{node} {proto} Full with {sorted(expected)}")
 
 
-def bgp_established(lab: Lab, node: str, peers: Iterable[str]) -> Predicate:
+def bgp_established(lab: Lab, node: str, peers: Iterable[str], afi: Afi = "ipv4") -> Predicate:
     expected = set(peers)
 
     def check() -> bool:
-        up = {p.address for p in lab.get_bgp_peers(node) if p.established}
+        up = {p.address for p in lab.get_bgp_peers(node, afi) if p.established}
         return expected <= up
 
-    return _named(check, f"{node} BGP Established with {sorted(expected)}")
+    return _named(check, f"{node} BGP {afi} Established with {sorted(expected)}")
 
 
 def bfd_peers_up(lab: Lab, node: str, peers: Iterable[str]) -> Predicate:
@@ -78,20 +81,27 @@ def bfd_peers_up(lab: Lab, node: str, peers: Iterable[str]) -> Predicate:
 
 
 def full_loopback_reachability(lab: Lab) -> Predicate:
-    """Every node has a selected route to every other node's loopback.
+    """Every node has a selected route to every other node's loopback(s).
 
-    Pairs listed in the vars file's ``expect.unreachable_loopbacks`` are skipped.
+    Covers ``loopback6`` too on dual-stack labs. Pairs listed in the vars file's
+    ``expect.unreachable_loopbacks`` are skipped.
     """
-    loopbacks = {n: str(lab.node_vars[n]["loopback"]) for n in lab.nodes}
+    loopbacks: dict[str, list[str]] = {
+        n: [str(lab.node_vars[n][k]) for k in ("loopback", "loopback6") if k in lab.node_vars[n]]
+        for n in lab.nodes
+    }
+    afis: list[Afi] = ["ipv4", "ipv6"] if lab.dual_stack else ["ipv4"]
 
     def check() -> bool:
         for node in lab.nodes:
-            table = lab.get_routes(node)
-            for other, prefix in loopbacks.items():
+            tables = {afi: lab.get_routes(node, afi) for afi in afis}
+            for other, prefixes in loopbacks.items():
                 if other == node or frozenset((node, other)) in lab.unreachable_pairs:
                     continue
-                if not any(r.selected and r.installed for r in table.get(prefix, [])):
-                    return False
+                for prefix in prefixes:
+                    routes = tables[afi_of(prefix)].get(prefix, [])
+                    if not any(r.selected and r.installed for r in routes):
+                        return False
         return True
 
     return _named(check, f"{lab.name}: full loopback reachability")
@@ -130,8 +140,9 @@ def prefixes_withdrawn(lab: Lab, nodes: Iterable[str], prefixes: Iterable[str]) 
 
     def check() -> bool:
         for node in nodes:
-            table = lab.get_routes(node)
+            tables = {afi: lab.get_routes(node, afi) for afi in {afi_of(p) for p in prefixes}}
             for prefix in prefixes:
+                table = tables[afi_of(prefix)]
                 if any(r.selected and r.installed for r in table.get(prefix, [])):
                     return False
         return True
@@ -140,13 +151,19 @@ def prefixes_withdrawn(lab: Lab, nodes: Iterable[str], prefixes: Iterable[str]) 
 
 
 def only_connected_routes(lab: Lab, node: str, protocols: Iterable[str]) -> Predicate:
-    """``node`` has no selected route learned via any of ``protocols`` (it is isolated)."""
+    """``node`` has no selected route learned via any of ``protocols`` (it is isolated).
+
+    On dual-stack labs both address families are checked.
+    """
     protos = set(protocols)
+    afis: list[Afi] = ["ipv4", "ipv6"] if lab.dual_stack else ["ipv4"]
 
     def check() -> bool:
-        table = lab.get_routes(node)
         return not any(
-            r.selected and r.protocol in protos for routes in table.values() for r in routes
+            r.selected and r.protocol in protos
+            for afi in afis
+            for routes in lab.get_routes(node, afi).values()
+            for r in routes
         )
 
     return _named(check, f"{node} has no {sorted(protos)} routes")

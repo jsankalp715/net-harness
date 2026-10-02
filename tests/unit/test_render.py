@@ -84,3 +84,21 @@ def test_maximum_paths_only_when_configured() -> None:
     assert "  maximum-paths 4\n" in leaf
     ring = render_node_config("r1", load_vars(TOPOLOGY_DIR / "bgp_ring.vars.yml")["r1"])
     assert "maximum-paths" not in ring  # existing topologies render unchanged
+
+
+def test_dual_stack_render() -> None:
+    cfg = render_node_config("r1", load_vars(TOPOLOGY_DIR / "bgp_ring.vars.yml")["r1"])
+    assert " ipv6 address fd00:2:12::1/64" in cfg
+    assert "ipv6 route 2001:db8:1::/48 blackhole" in cfg
+    v4_af = cfg.split(" address-family ipv4 unicast")[1].split("exit-address-family")[0]
+    v6_af = cfg.split(" address-family ipv6 unicast")[1].split("exit-address-family")[0]
+    assert "  no neighbor fd00:2:13::2 activate" in v4_af  # v6 peers don't carry IPv4
+    assert "  neighbor fd00:2:13::2 activate" in v6_af
+    assert "  neighbor fd00:2:12::2 next-hop-self" in v6_af  # iBGP v6 peer
+    assert "  network 2001:db8:1::/48" in v6_af
+    ospf = render_node_config("r1", load_vars(TOPOLOGY_DIR / "ospf_triangle.vars.yml")["r1"])
+    assert "router ospf6\n ospf6 router-id 10.0.0.1" in ospf
+    assert ospf.count(" ipv6 ospf6 network point-to-point") == 2
+    # IPv4-only topologies are untouched
+    leaf = render_node_config("leaf1", load_vars(TOPOLOGY_DIR / "spine_leaf.vars.yml")["leaf1"])
+    assert "ipv6" not in leaf and "ospf6" not in leaf

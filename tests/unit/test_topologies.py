@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 from pathlib import Path
 
 import pytest
@@ -39,6 +40,10 @@ def test_vars_match_links(path: Path) -> None:
         net_a = a["address"].rsplit(".", 1)[0]
         net_b = b["address"].rsplit(".", 1)[0]
         assert net_a == net_b, f"{link}: {a['address']} vs {b['address']}"
+        if "address6" in a or "address6" in b:  # dual-stack: both ends, same /64
+            prefix_a = ipaddress.ip_interface(a["address6"]).network
+            prefix_b = ipaddress.ip_interface(b["address6"]).network
+            assert prefix_a == prefix_b, f"{link}: {a['address6']} vs {b['address6']}"
 
 
 def test_lab_parses_links_and_container_names() -> None:

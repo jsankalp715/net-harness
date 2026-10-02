@@ -4,7 +4,7 @@
 ![python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![FRR](https://img.shields.io/badge/FRR-10.5.5-blue)
 ![containerlab](https://img.shields.io/badge/containerlab-0.79.0-blue)
-![tests](https://img.shields.io/badge/tests-129-brightgreen)
+![tests](https://img.shields.io/badge/tests-162-brightgreen)
 
 **Break a network on purpose, measure how fast it heals, and fail CI if it gets slower.**
 
@@ -14,10 +14,11 @@
 | Silent packet loss, BFD vs. protocol timers | **5–11× faster** detection (BGP 7.05 s → 0.63 s) |
 | Whole data-centre spine fails (2-spine / 4-leaf) | all 12 leaf paths rerouted in **0.73 s** |
 | Router isolated, no backup path | every route to it withdrawn in **~0.5 s**, none left stale |
-| Coverage | 6 labs · 129 tests · 31 tracked timings · runs on every push |
+| IPv6 (dual-stack OSPFv3 + BGP) | matches IPv4 recovery once DAD is accounted for ([why](docs/FINDINGS.md#6-ipv6-recovered-2-slower-than-ipv4-and-the-cause-was-dad-not-routing)) |
+| Coverage | 6 labs · dual-stack · 162 tests · runs on every push |
 
 📄 **[What the harness found](docs/FINDINGS.md)**: real timer problems, a measurement bug,
-and what BFD buys you.
+what BFD buys you, and why IPv6 was 2× slower at first.
 
 ![Convergence trends across CI runs](docs/trends.png)
 *`make trends`: every tracked timing across CI runs; the dashed line is the regression baseline.*
@@ -122,6 +123,22 @@ else. There is no IGP. Each router originates its loopback and `192.168.N.0/24`.
   AS65002      eBGP      AS65003
 ```
 
+**Dual-stack (IPv4 + IPv6).** Both labs above, and their BFD variants, run IPv6 alongside
+IPv4, as most production networks do. The triangle runs **OSPFv3** next to OSPFv2. The
+ring runs **separate IPv6 BGP sessions** next to the IPv4 ones (IPv6 peers are explicitly
+deactivated in the IPv4 address family), with `next-hop-self` on iBGP. Addressing follows a
+fixed mapping, so it's predictable:
+
+| IPv4 | IPv6 |
+|---|---|
+| link `10.X.AB.H/30` | `fd00:X:AB::H/64` |
+| loopback `10.0.0.N/32` | `fd00::N/128` |
+| BGP customer `192.168.N.0/24` | `2001:db8:N::/48` (documentation range) |
+
+Vars keys: `address6` per interface, plus `loopback6`, `static_routes6`, `bgp.networks6`
+and `bgp.neighbors6` per node. A node without `loopback6` renders IPv4-only, which is how
+`spine_leaf` stays IPv4-only.
+
 **`ospf_triangle_bfd`, `bgp_ring_bfd`**: the same wiring with BFD (200 ms × 3, about
 600 ms to detect a failure) on every OSPF interface and BGP session. Their vars files hold
 only the difference: `extends: <base>.vars.yml` plus a `defaults.bfd` profile.
@@ -201,10 +218,11 @@ paths such as `configs/daemons` straight to the Docker daemon, so the two paths 
 |---|---|---|
 | `test_ospf.py` | ospf | initial convergence time; every adjacency `Full` on the right interface; every loopback learned via OSPF over the direct link with metric 10; ECMP (2 next hops) to the remote transit /30 |
 | `test_bgp.py` | bgp | every iBGP/eBGP session `Established`, with session type matching the ASNs; each node originates its networks and advertises them to every peer; 12 (node, prefix) best-path checks covering AS path and egress interface; AS-path loop prevention |
-| `test_failover.py` | failure + ospf/bgp | for 4 cases across both topologies: the link cut moves the route to the backup interface within an SLA (failover time recorded); the link restore returns the route to the primary path (restore time recorded) |
+| `test_failover.py` | failure + ospf/bgp (+ ipv6) | for 6 cases across both topologies, including IPv6 twins (`ospf6-*`, `bgp6-*`): the link cut moves the route to the backup interface within an SLA (failover time recorded); the link restore returns the route to the primary path (restore time recorded) |
 | `test_netem.py` | ospf, netem, failure | 50/150 ms delay leaves adjacency and path untouched past the dead interval; silent 100% loss (carrier stays up) is detected only by the OSPF dead interval, so failover must take ≈ dead interval |
 | `test_spine_leaf.py` | bgp, failure | All 12 fabric sessions up; **2-way ECMP** for all 12 leaf pairs (AS path `65100 <leaf>`); one uplink failure collapses the affected paths onto the other spine and restores ECMP; a **whole spine failing** drains all 12 leaf-pair paths onto the survivor and back; the spines never learn each other's loopback |
 | `test_partition.py` | failure, ospf/bgp | Isolating a router (all of its links cut) makes every other router **withdraw** its prefixes, and the isolated router loses all learned routes. There's no stale route left to blackhole traffic, and the withdrawn state must hold for 3 s, so BGP path hunting has really settled. Withdrawal and heal times are recorded |
+| `test_ipv6.py` | ipv6, ospf/bgp | OSPFv3 adjacencies `Full` on the right interfaces; every IPv6 loopback learned via OSPFv3 over the direct link; all IPv6 BGP sessions Established with the correct session type; IPv6 best paths **mirror IPv4 exactly** (AS path and egress, 12 cases); an **end-to-end IPv6 ping** between every pair of loopbacks, which proves the data plane forwards and not just that routes exist |
 | `test_bfd.py` | bfd, ospf/bgp, netem, failure | BFD sessions `up` on every link with the configured interval and multiplier; silent 100% loss detected by **BFD in ≤ 2 s** (OSPF and BGP) vs. the **BGP hold timer (5–15 s)** without it (the OSPF no-BFD reference is in `test_netem.py`) |
 
 ### Per-scenario JSON log (`results/<module>__<test>[<id>].json`)
@@ -276,7 +294,7 @@ last month.
 1. **New topology (optional).** Add `topologies/<name>.clab.yml` (kind `linux`, the pinned
    image, plus the two `configs/` binds; copy an existing file) and
    `topologies/<name>.vars.yml` with per-node `router_id`, `loopback`, `interfaces`
-   (`address`, `peer`) and `ospf:` / `bgp:` / `bfd:` blocks. For a variant of an existing
+   (`address`, `peer`, optional `address6`) and `ospf:` / `bgp:` / `bfd:` blocks. For a variant of an existing
    topology, start the vars file with `extends: <base>.vars.yml` and state only the delta. `tests/unit/test_topologies.py`
    checks that the image pin, the link endpoints and the subnets are consistent.
 2. **New config feature (optional).** Extend a partial in `templates/` and add a unit test in
