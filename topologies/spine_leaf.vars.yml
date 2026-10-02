@@ -1,0 +1,104 @@
+# Jinja2 variables for spine_leaf.clab.yml (generated layout, see the .clab.yml header).
+# Same-AS spines can never learn each other's routes: the only path is spine -> leaf ->
+# spine, and the receiving spine drops it on seeing its own AS 65100 (the RFC 7938 design).
+# This is the fabric's loop prevention working, and it's asserted by test_spine_leaf.py.
+expect:
+  unreachable_loopbacks:
+    - [spine1, spine2]
+
+defaults:
+  bgp:
+    keepalive: 3
+    holdtime: 9
+    connect_retry: 1
+    maximum_paths: 4
+
+nodes:
+  spine1:
+    router_id: 10.0.1.1
+    loopback: 10.0.1.1/32
+    interfaces:
+      eth1: {address: 10.3.11.1/30, peer: leaf1}
+      eth2: {address: 10.3.12.1/30, peer: leaf2}
+      eth3: {address: 10.3.13.1/30, peer: leaf3}
+      eth4: {address: 10.3.14.1/30, peer: leaf4}
+    bgp:
+      asn: 65100
+      networks: [10.0.1.1/32]
+      neighbors:
+        - {address: 10.3.11.2, remote_as: 65101, description: leaf1}
+        - {address: 10.3.12.2, remote_as: 65102, description: leaf2}
+        - {address: 10.3.13.2, remote_as: 65103, description: leaf3}
+        - {address: 10.3.14.2, remote_as: 65104, description: leaf4}
+  spine2:
+    router_id: 10.0.1.2
+    loopback: 10.0.1.2/32
+    interfaces:
+      eth1: {address: 10.3.21.1/30, peer: leaf1}
+      eth2: {address: 10.3.22.1/30, peer: leaf2}
+      eth3: {address: 10.3.23.1/30, peer: leaf3}
+      eth4: {address: 10.3.24.1/30, peer: leaf4}
+    bgp:
+      asn: 65100
+      networks: [10.0.1.2/32]
+      neighbors:
+        - {address: 10.3.21.2, remote_as: 65101, description: leaf1}
+        - {address: 10.3.22.2, remote_as: 65102, description: leaf2}
+        - {address: 10.3.23.2, remote_as: 65103, description: leaf3}
+        - {address: 10.3.24.2, remote_as: 65104, description: leaf4}
+  leaf1:
+    router_id: 10.0.2.1
+    loopback: 10.0.2.1/32
+    interfaces:
+      eth1: {address: 10.3.11.2/30, peer: spine1}
+      eth2: {address: 10.3.21.2/30, peer: spine2}
+    static_routes:
+      - {prefix: 192.168.11.0/24, via: blackhole}
+    bgp:
+      asn: 65101
+      networks: [10.0.2.1/32, 192.168.11.0/24]
+      neighbors:
+        - {address: 10.3.11.1, remote_as: 65100, description: spine1}
+        - {address: 10.3.21.1, remote_as: 65100, description: spine2}
+  leaf2:
+    router_id: 10.0.2.2
+    loopback: 10.0.2.2/32
+    interfaces:
+      eth1: {address: 10.3.12.2/30, peer: spine1}
+      eth2: {address: 10.3.22.2/30, peer: spine2}
+    static_routes:
+      - {prefix: 192.168.12.0/24, via: blackhole}
+    bgp:
+      asn: 65102
+      networks: [10.0.2.2/32, 192.168.12.0/24]
+      neighbors:
+        - {address: 10.3.12.1, remote_as: 65100, description: spine1}
+        - {address: 10.3.22.1, remote_as: 65100, description: spine2}
+  leaf3:
+    router_id: 10.0.2.3
+    loopback: 10.0.2.3/32
+    interfaces:
+      eth1: {address: 10.3.13.2/30, peer: spine1}
+      eth2: {address: 10.3.23.2/30, peer: spine2}
+    static_routes:
+      - {prefix: 192.168.13.0/24, via: blackhole}
+    bgp:
+      asn: 65103
+      networks: [10.0.2.3/32, 192.168.13.0/24]
+      neighbors:
+        - {address: 10.3.13.1, remote_as: 65100, description: spine1}
+        - {address: 10.3.23.1, remote_as: 65100, description: spine2}
+  leaf4:
+    router_id: 10.0.2.4
+    loopback: 10.0.2.4/32
+    interfaces:
+      eth1: {address: 10.3.14.2/30, peer: spine1}
+      eth2: {address: 10.3.24.2/30, peer: spine2}
+    static_routes:
+      - {prefix: 192.168.14.0/24, via: blackhole}
+    bgp:
+      asn: 65104
+      networks: [10.0.2.4/32, 192.168.14.0/24]
+      neighbors:
+        - {address: 10.3.14.1, remote_as: 65100, description: spine1}
+        - {address: 10.3.24.1, remote_as: 65100, description: spine2}

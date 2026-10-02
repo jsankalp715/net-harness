@@ -77,3 +77,10 @@ def test_bfd_variants_render_bfd_everywhere() -> None:
     # the non-BFD base topologies must stay BFD-free
     base = render_node_config("r1", load_vars(TOPOLOGY_DIR / "ospf_triangle.vars.yml")["r1"])
     assert "bfd" not in base
+
+
+def test_maximum_paths_only_when_configured() -> None:
+    leaf = render_node_config("leaf1", load_vars(TOPOLOGY_DIR / "spine_leaf.vars.yml")["leaf1"])
+    assert "  maximum-paths 4\n" in leaf
+    ring = render_node_config("r1", load_vars(TOPOLOGY_DIR / "bgp_ring.vars.yml")["r1"])
+    assert "maximum-paths" not in ring  # existing topologies render unchanged

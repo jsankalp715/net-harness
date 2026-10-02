@@ -1,0 +1,36 @@
+# 2-spine / 4-leaf eBGP fabric (RFC 7938 style). Every leaf has one uplink to each
+# spine; there are no spine-spine or leaf-leaf links.
+#
+#        spine1 (AS65100)      spine2 (AS65100)
+#              |  full mesh to every leaf  |
+#    leaf1    leaf2    leaf3    leaf4      (leafN: eth1 -> spine1, eth2 -> spine2)
+#    AS65101  AS65102  AS65103  AS65104
+#
+# Spines share one ASN so a route can never go leaf -> spine -> leaf -> spine: the second
+# spine sees its own AS in the path and drops it. Leaves load-balance across both spines
+# (ECMP, maximum-paths). spineS:ethL <-> leafL:ethS on 10.3.SL.0/30 (spine .1, leaf .2).
+name: spine-leaf
+
+topology:
+  defaults:
+    kind: linux
+    image: quay.io/frrouting/frr:10.5.5
+    binds:
+      - ../configs/daemons:/etc/frr/daemons:ro
+      - ../configs/vtysh.conf:/etc/frr/vtysh.conf:ro
+  nodes:
+    spine1: {}
+    spine2: {}
+    leaf1: {}
+    leaf2: {}
+    leaf3: {}
+    leaf4: {}
+  links:
+    - endpoints: ["spine1:eth1", "leaf1:eth1"]
+    - endpoints: ["spine2:eth1", "leaf1:eth2"]
+    - endpoints: ["spine1:eth2", "leaf2:eth1"]
+    - endpoints: ["spine2:eth2", "leaf2:eth2"]
+    - endpoints: ["spine1:eth3", "leaf3:eth1"]
+    - endpoints: ["spine2:eth3", "leaf3:eth2"]
+    - endpoints: ["spine1:eth4", "leaf4:eth1"]
+    - endpoints: ["spine2:eth4", "leaf4:eth2"]

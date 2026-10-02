@@ -15,6 +15,9 @@ router bgp {{ node.bgp.asn }}
 {% endfor %}
  !
  address-family ipv4 unicast
+{% if node.bgp.maximum_paths is defined %}
+  maximum-paths {{ node.bgp.maximum_paths }}
+{% endif %}
 {% for prefix in node.bgp.networks %}
   network {{ prefix }}
 {% endfor %}

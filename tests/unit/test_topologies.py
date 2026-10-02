@@ -59,3 +59,8 @@ def test_links_of_lists_every_link_of_a_node() -> None:
     }
     with pytest.raises(KeyError):
         lab.links_of("r9")
+
+
+def test_unreachable_pairs_loaded_from_vars() -> None:
+    assert Lab("spine_leaf").unreachable_pairs == {frozenset({"spine1", "spine2"})}
+    assert Lab("ospf_triangle").unreachable_pairs == set()
