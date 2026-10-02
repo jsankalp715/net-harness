@@ -1,5 +1,29 @@
 # net-harness
 
+[![ci](https://github.com/jsankalp715/net-harness/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jsankalp715/net-harness/actions/workflows/ci.yml)
+![python](https://img.shields.io/badge/python-3.11%2B-blue)
+![FRR](https://img.shields.io/badge/FRR-10.5.5-blue)
+![containerlab](https://img.shields.io/badge/containerlab-0.79.0-blue)
+![tests](https://img.shields.io/badge/tests-129-brightgreen)
+
+**Break a network on purpose, measure how fast it heals, and fail CI if it gets slower.**
+
+| At a glance (GitHub Actions) | |
+|---|---|
+| Link cut with a backup path (OSPF / BGP) | traffic moves in **~0.07 s** |
+| Silent packet loss, BFD vs. protocol timers | **5–11× faster** detection (BGP 7.05 s → 0.63 s) |
+| Whole data-centre spine fails (2-spine / 4-leaf) | all 12 leaf paths rerouted in **0.73 s** |
+| Router isolated, no backup path | every route to it withdrawn in **~0.5 s**, none left stale |
+| Coverage | 6 labs · 129 tests · 31 tracked timings · runs on every push |
+
+📄 **[What the harness found](docs/FINDINGS.md)**: real timer problems, a measurement bug,
+and what BFD buys you.
+
+![Convergence trends across CI runs](docs/trends.png)
+*`make trends`: every tracked timing across CI runs; the dashed line is the regression baseline.*
+
+---
+
 Automated network test harness. It spins up [containerlab](https://containerlab.dev)
 topologies of FRR routers, renders and pushes OSPF/BGP configs, injects link faults
 (including netem gray failures), and asserts routing-table convergence with measured
