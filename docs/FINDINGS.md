@@ -2,7 +2,8 @@
 
 `net-harness` breaks virtual networks on purpose and measures how fast routing recovers.
 This page covers what that turned up: two problems in my own setup, one in my own
-measurement code, and a clear number for what BFD is worth. All numbers are from GitHub
+measurement code, a clear number for what BFD is worth, and why IPv6 was at first 2×
+slower than IPv4. All numbers are from GitHub
 Actions (CI run 18) unless stated otherwise.
 
 **Setup in one paragraph.** Routers are FRR 10.5.5 containers wired together by
@@ -122,6 +123,41 @@ router's loopback. That turned out to be correct behaviour. The spines share one
 receiving spine rejects it because its own AS appears in the path. Rather than weaken the
 check, the topology now *declares* that pair as unreachable by design, and a test asserts
 that it really is.
+
+---
+
+## 6. IPv6 recovered 2× slower than IPv4, and the cause was DAD, not routing
+
+**Symptom.** After making the OSPF and BGP labs dual-stack, all 162 tests passed, but the
+regression check flagged partition *heal* times (BGP 1.40 s → 4.98 s). The IPv6 restores
+explained it. OSPFv3 restore took **2.71 s** against 1.21 s for OSPFv2, and BGP over IPv6
+took **3.70 s** against 1.50 s for IPv4.
+
+**Hypothesis.** IPv6 **Duplicate Address Detection**. When an interface comes back up,
+Linux marks its IPv6 addresses *tentative* for about a second while it checks that nobody
+else is using them. OSPFv3 can't form an adjacency, and BGP can't open its TCP session,
+on a tentative address.
+
+**Experiment.** I disabled DAD in the lab (`accept_dad=0`, `dad_transmits=0`) and
+re-measured only the restore tests:
+
+| Restore | IPv4 | IPv6 with DAD | IPv6, DAD off |
+|---|---:|---:|---:|
+| OSPF | 1.05 s | 2.71 s | **1.33 s** |
+| BGP | 1.41 s | 3.70 s | **1.40 s** |
+
+That confirmed it: DAD added roughly **1.4–2.3 s to every IPv6 recovery**, and without it
+IPv6 matches IPv4.
+
+**Decision.** The labs now run with DAD off, documented in the topology files, so the
+harness measures the routing protocols and IPv4 and IPv6 stay comparable. On
+point-to-point links with configured addresses a duplicate can't occur. Production
+networks usually keep DAD on; *optimistic DAD* (RFC 4429) is the standard way to avoid
+this delay without giving up the check.
+
+**Takeaway.** "IPv6 converges slower" sounded like a routing problem, but the delay was
+in the host's IPv6 stack, below the routing protocols. A single controlled change was
+enough to separate the two.
 
 ---
 

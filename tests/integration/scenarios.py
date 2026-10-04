@@ -31,6 +31,15 @@ class FailoverCase:
     backup_iface: str
     max_failover_s: float
     max_restore_s: float
+    route_protocol: str = ""  # RIB protocol if it differs from ``protocol`` (e.g. "ospf6")
+
+    @property
+    def rib_protocol(self) -> str:
+        return self.route_protocol or self.protocol
+
+    @property
+    def ipv6(self) -> bool:
+        return ":" in self.prefix
 
 
 FAILOVER_CASES: list[FailoverCase] = [
@@ -82,13 +91,44 @@ FAILOVER_CASES: list[FailoverCase] = [
         max_failover_s=10.0,
         max_restore_s=20.0,
     ),
+    # IPv6 twins of the first and third cases (dual-stack labs: OSPFv3, BGP over IPv6)
+    FailoverCase(
+        id="ospf6-r1-to-r2-cut-r1r2",
+        topology="ospf_triangle",
+        protocol="ospf",
+        observer="r1",
+        prefix="fd00::2/128",
+        cut=("r1", "r2"),
+        primary_iface="eth1",
+        backup_iface="eth2",
+        max_failover_s=5.0,
+        max_restore_s=15.0,
+        route_protocol="ospf6",
+    ),
+    FailoverCase(
+        id="bgp6-r1-to-as65002-cut-r1r3",
+        topology="bgp_ring",
+        protocol="bgp",
+        observer="r1",
+        prefix="2001:db8:3::/48",
+        cut=("r1", "r3"),
+        primary_iface="eth2",
+        backup_iface="eth1",
+        max_failover_s=10.0,
+        max_restore_s=20.0,
+    ),
 ]
 
 
 def failover_params() -> list[Any]:
     """``(lab, case)`` params; ``lab`` is indirect so each topology deploys once."""
     return [
-        pytest.param(c.topology, c, id=c.id, marks=[getattr(pytest.mark, c.protocol)])
+        pytest.param(
+            c.topology,
+            c,
+            id=c.id,
+            marks=[getattr(pytest.mark, c.protocol)] + ([pytest.mark.ipv6] if c.ipv6 else []),
+        )
         for c in FAILOVER_CASES
     ]
 

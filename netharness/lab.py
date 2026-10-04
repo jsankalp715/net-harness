@@ -8,7 +8,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 
@@ -24,6 +24,7 @@ from netharness.parsers import (
     parse_bfd_peers,
     parse_bgp_rib,
     parse_bgp_summary,
+    parse_ospf6_neighbors,
     parse_ospf_neighbors,
     parse_routes,
     selected_route,
@@ -35,6 +36,13 @@ from netharness.shell import CommandError, CommandResult, run
 log = logging.getLogger(__name__)
 
 _REMOTE_CONFIG_PATH = "/tmp/netharness-frr.conf"
+
+Afi = Literal["ipv4", "ipv6"]
+_ROUTE_CMD: dict[str, str] = {"ipv4": "ip", "ipv6": "ipv6"}
+
+
+def afi_of(prefix: str) -> Afi:
+    return "ipv6" if ":" in prefix else "ipv4"
 
 
 class LabError(RuntimeError):
@@ -244,22 +252,29 @@ class Lab:
             self.configure(node)
 
     # ------------------------------------------------------------------ state
-    def get_routes(self, node: str) -> RoutingTable:
-        return parse_routes(self.vtysh_json(node, "show ip route json"))
+    def get_routes(self, node: str, afi: Afi = "ipv4") -> RoutingTable:
+        return parse_routes(self.vtysh_json(node, f"show {_ROUTE_CMD[afi]} route json"))
 
     def get_route(self, node: str, prefix: str) -> Route | None:
-        """Selected+installed route for ``prefix`` on ``node`` (``None`` if absent)."""
-        data = self.vtysh_json(node, f"show ip route {prefix} json")
+        """Selected+installed route for ``prefix`` (IPv4 or IPv6) on ``node``, or ``None``."""
+        data = self.vtysh_json(node, f"show {_ROUTE_CMD[afi_of(prefix)]} route {prefix} json")
         return selected_route(parse_routes(data), prefix)
 
-    def get_ospf_neighbors(self, node: str) -> list[OspfNeighbor]:
+    def get_ospf_neighbors(self, node: str, afi: Afi = "ipv4") -> list[OspfNeighbor]:
+        """OSPFv2 neighbours, or OSPFv3 with ``afi="ipv6"`` (same dataclass, other JSON)."""
+        if afi == "ipv6":
+            return parse_ospf6_neighbors(self.vtysh_json(node, "show ipv6 ospf6 neighbor json"))
         return parse_ospf_neighbors(self.vtysh_json(node, "show ip ospf neighbor json"))
 
-    def get_bgp_peers(self, node: str) -> list[BgpPeer]:
-        return parse_bgp_summary(self.vtysh_json(node, "show bgp ipv4 unicast summary json"))
+    def get_bgp_peers(self, node: str, afi: Afi = "ipv4") -> list[BgpPeer]:
+        return parse_bgp_summary(self.vtysh_json(node, f"show bgp {afi} unicast summary json"))
 
-    def get_bgp_rib(self, node: str) -> dict[str, list[BgpPath]]:
-        return parse_bgp_rib(self.vtysh_json(node, "show bgp ipv4 unicast json"))
+    def get_bgp_rib(self, node: str, afi: Afi = "ipv4") -> dict[str, list[BgpPath]]:
+        return parse_bgp_rib(self.vtysh_json(node, f"show bgp {afi} unicast json"))
+
+    @property
+    def dual_stack(self) -> bool:
+        return any("loopback6" in v for v in self.node_vars.values())
 
     def get_bfd_peers(self, node: str) -> list[BfdPeer]:
         return parse_bfd_peers(self.vtysh_json(node, "show bfd peers json"))
@@ -270,6 +285,8 @@ class Lab:
         for node in self.nodes:
             try:
                 tables[node] = table_summary(self.get_routes(node))
+                if self.dual_stack:  # v4 and v6 prefixes never collide as keys
+                    tables[node].update(table_summary(self.get_routes(node, "ipv6")))
             except (CommandError, LabError) as exc:
                 tables[node] = {"error": {"message": str(exc)}}
         return tables
@@ -282,6 +299,9 @@ class Lab:
             for cmd in (
                 "show ip route",
                 "show ip ospf neighbor",
+                "show ipv6 route",
+                "show ipv6 ospf6 neighbor",
+                "show bgp ipv6 unicast summary",
                 "show bgp ipv4 unicast summary",
                 "show bfd peers brief",
             ):

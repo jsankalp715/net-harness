@@ -3,6 +3,13 @@ interface lo
 {% if node.ospf is defined %}
  ip ospf area {{ node.ospf.area }}
 {% endif %}
+{% if node.loopback6 is defined %}
+ ipv6 address {{ node.loopback6 }}
+{% if node.ospf is defined %}
+ ipv6 ospf6 area {{ node.ospf.area }}
+ ipv6 ospf6 passive
+{% endif %}
+{% endif %}
 exit
 !
 {% for ifname, intf in node.interfaces | dictsort %}
@@ -21,6 +28,20 @@ interface {{ ifname }}
 {% if node.bfd is defined %}
  ip ospf bfd
  ip ospf bfd profile {{ node.bfd.profile }}
+{% endif %}
+{% endif %}
+{% if intf.address6 is defined %}
+ ipv6 address {{ intf.address6 }}
+{% if node.ospf is defined and intf.ospf | default(true) %}
+ ipv6 ospf6 area {{ node.ospf.area }}
+ ipv6 ospf6 network point-to-point
+ ipv6 ospf6 hello-interval {{ node.ospf.hello_interval }}
+ ipv6 ospf6 dead-interval {{ node.ospf.dead_interval }}
+ ipv6 ospf6 retransmit-interval {{ node.ospf.retransmit_interval }}
+ ipv6 ospf6 cost {{ intf.ospf_cost | default(node.ospf.default_cost) }}
+{% if node.bfd is defined %}
+ ipv6 ospf6 bfd profile {{ node.bfd.profile }}
+{% endif %}
 {% endif %}
 {% endif %}
 exit

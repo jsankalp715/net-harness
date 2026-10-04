@@ -3,7 +3,7 @@ router bgp {{ node.bgp.asn }}
  bgp log-neighbor-changes
  no bgp ebgp-requires-policy
  timers bgp {{ node.bgp.keepalive }} {{ node.bgp.holdtime }}
-{% for nbr in node.bgp.neighbors %}
+{% for nbr in node.bgp.neighbors + node.bgp.neighbors6 | default([]) %}
  neighbor {{ nbr.address }} remote-as {{ nbr.remote_as }}
  neighbor {{ nbr.address }} description {{ nbr.description | default(nbr.address) }}
  neighbor {{ nbr.address }} advertisement-interval 0
@@ -26,6 +26,26 @@ router bgp {{ node.bgp.asn }}
   neighbor {{ nbr.address }} next-hop-self
 {% endif %}
 {% endfor %}
+{% for nbr in node.bgp.neighbors6 | default([]) %}
+  no neighbor {{ nbr.address }} activate
+{% endfor %}
  exit-address-family
+{% if node.bgp.neighbors6 is defined %}
+ !
+ address-family ipv6 unicast
+{% if node.bgp.maximum_paths is defined %}
+  maximum-paths {{ node.bgp.maximum_paths }}
+{% endif %}
+{% for prefix in node.bgp.networks6 | default([]) %}
+  network {{ prefix }}
+{% endfor %}
+{% for nbr in node.bgp.neighbors6 %}
+  neighbor {{ nbr.address }} activate
+{% if nbr.remote_as == node.bgp.asn %}
+  neighbor {{ nbr.address }} next-hop-self
+{% endif %}
+{% endfor %}
+ exit-address-family
+{% endif %}
 exit
 !

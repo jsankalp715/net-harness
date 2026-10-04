@@ -1,0 +1,7 @@
+router ospf6
+ ospf6 router-id {{ node.router_id }}
+ timers throttle spf {{ node.ospf.spf_delay_ms }} {{ node.ospf.spf_initial_hold_ms }} {{ node.ospf.spf_max_hold_ms }}
+ timers lsa min-arrival {{ node.ospf.lsa_min_arrival_ms }}
+ log-adjacency-changes
+exit
+!

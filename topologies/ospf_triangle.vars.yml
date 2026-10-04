@@ -22,18 +22,21 @@ nodes:
   r1:
     router_id: 10.0.0.1
     loopback: 10.0.0.1/32
+    loopback6: fd00::1/128
     interfaces:
-      eth1: {address: 10.1.12.1/30, peer: r2}
-      eth2: {address: 10.1.13.1/30, peer: r3}
+      eth1: {address: 10.1.12.1/30, address6: fd00:1:12::1/64, peer: r2}
+      eth2: {address: 10.1.13.1/30, address6: fd00:1:13::1/64, peer: r3}
   r2:
     router_id: 10.0.0.2
     loopback: 10.0.0.2/32
+    loopback6: fd00::2/128
     interfaces:
-      eth1: {address: 10.1.12.2/30, peer: r1}
-      eth2: {address: 10.1.23.1/30, peer: r3}
+      eth1: {address: 10.1.12.2/30, address6: fd00:1:12::2/64, peer: r1}
+      eth2: {address: 10.1.23.1/30, address6: fd00:1:23::1/64, peer: r3}
   r3:
     router_id: 10.0.0.3
     loopback: 10.0.0.3/32
+    loopback6: fd00::3/128
     interfaces:
-      eth1: {address: 10.1.13.2/30, peer: r1}
-      eth2: {address: 10.1.23.2/30, peer: r2}
+      eth1: {address: 10.1.13.2/30, address6: fd00:1:13::2/64, peer: r1}
+      eth2: {address: 10.1.23.2/30, address6: fd00:1:23::2/64, peer: r2}

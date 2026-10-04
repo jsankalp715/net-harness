@@ -40,6 +40,7 @@ markers = [
     "failure: link failure / restore scenarios",
     "netem: netem loss/delay scenarios (skipped if kernel lacks sch_netem)",
     "bfd: BFD-accelerated failure detection",
+    "ipv6: IPv6 / dual-stack scenarios",
 ]
 
 [tool.ruff]

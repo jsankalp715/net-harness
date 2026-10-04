@@ -203,6 +203,25 @@ def parse_ospf_neighbors(data: dict[str, Any]) -> list[OspfNeighbor]:
     return neighbors
 
 
+def parse_ospf6_neighbors(data: dict[str, Any]) -> list[OspfNeighbor]:
+    """Parse ``show ipv6 ospf6 neighbor json`` (OSPFv3).
+
+    Shape (FRR 10.5.5): ``{"neighbors": [{"neighborId", "state", "interfaceName", ...}]}``,
+    a list, unlike OSPFv2's dict keyed by router-id. OSPFv3 peers over link-local
+    addresses, which this output doesn't include, so ``address`` is empty.
+    """
+    return [
+        OspfNeighbor(
+            router_id=str(e.get("neighborId", "")),
+            state=str(e.get("state", "")),
+            role=str(e.get("ifState", "")),
+            interface=str(e.get("interfaceName", "")),
+            address="",
+        )
+        for e in data.get("neighbors", [])
+    ]
+
+
 def parse_bgp_summary(data: dict[str, Any]) -> list[BgpPeer]:
     """Parse ``show bgp ipv4 unicast summary json`` (or ``show bgp summary json``)."""
     if "peers" not in data and "ipv4Unicast" in data:
