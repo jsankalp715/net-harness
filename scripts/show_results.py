@@ -27,7 +27,9 @@ def main() -> int:
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
 
     counts = " · ".join(f"{n} {k}" for k, n in summary["counts"].items())
-    print(f"{BOLD}Last run:{RESET} {counts}   ({summary['finished_at'][:19].replace('T', ' ')} UTC)\n")
+    print(
+        f"{BOLD}Last run:{RESET} {counts}   ({summary['finished_at'][:19].replace('T', ' ')} UTC)\n"
+    )
     print(f"{BOLD}{'result':8} {'scenario':64} convergence{RESET}")
     for sc in summary["scenarios"]:
         ok = sc["outcome"] == "passed"
