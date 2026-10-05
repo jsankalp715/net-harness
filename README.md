@@ -201,6 +201,18 @@ paths such as `configs/daemons` straight to the Docker daemon, so the two paths 
 | `make baseline-check` / `baseline-update` | compare against / overwrite the stored baseline |
 | `make trends` | plot every metric across past CI runs → `results/trends/index.html` (needs `gh auth login`) |
 | `make docker-test` | `scripts/run_in_docker.sh` |
+| `make demo` | narrated ~40 s live demo: build an OSPF network, cut a link, watch it heal |
+
+### Presenting it (guided demo)
+
+`bash scripts/showcase.sh` walks through the whole project in five acts, pausing between
+them (Enter = next act, `s` = skip): **live demo** (`make demo`) → **inside a router**
+(real FRR CLI: OSPF neighbours, ECMP, IPv6) → **the real test suite** (failover tests,
+~2 min) → **evidence** (`scripts/show_results.py`: each scenario's timings plus one router's
+route before / during / after a failure) → **CI and trends** (opens the repo, Actions,
+findings and the trend chart). If Docker isn't running, it starts it first (on Windows via
+`scripts/start_docker_windows.ps1`, which works around stale-socket startup crashes).
+Options: `--quick` skips the test act, `--auto` runs without pauses, `--no-browser`.
 
 ### Useful pytest selections
 
